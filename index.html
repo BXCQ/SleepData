@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>睡眠数据上传</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: #fff;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input,
+        button,
+        select {
+            padding: 0.8rem;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.25);
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .message {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .message.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .api-info {
+            background-color: #e2f0fd;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .api-info p {
+            margin: 0.5rem 0;
+        }
+
+        .api-info code {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .buttons button {
+            flex: 1;
+        }
+
+        .test-button {
+            background-color: #28a745;
+        }
+
+        .test-button:hover {
+            background-color: #218838;
+        }
+
+        .view-data-link {
+            display: block;
+            text-align: center;
+            margin-top: 1rem;
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .view-data-link:hover {
+            text-decoration: underline;
+        }
+
+        .duration-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .duration-selector select {
+            flex: 1;
+        }
+
+        .ocr-section {
+            background-color: #eef5fd;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px dashed #007bff;
+            margin-bottom: 1rem;
+        }
+
+        .ocr-section>label {
+            font-weight: 600;
+            color: #2c3e50;
+            display: block;
+            margin-bottom: 0.8rem;
+        }
+
+        .ocr-input-group {
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+        }
+
+        .ocr-input-group input[type="file"] {
+            flex: 1;
+            border: none;
+            padding: 0;
+        }
+
+        .ocr-input-group button {
+            background-color: #28a745;
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .ocr-input-group button:hover {
+            background-color: #218838;
+        }
+
+        #ocr-status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+            background: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            display: none;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+                text-size-adjust: 100%;
+                -webkit-text-size-adjust: 100%;
+                /* 防止iPhone字体自动放大 */
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 10px;
+            }
+
+            .ocr-input-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+    <!-- 添加 Tesseract.js for OCR -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>睡眠数据上传</h1>
+
+        <div class="ocr-section">
+            <label>通过图片自动识别</label>
+            <div class="ocr-input-group">
+                <!-- 隐藏的原始文件输入框 -->
+                <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+                <input type="file" id="gallery-input" accept="image/*" style="display: none;">
+
+                <button type="button" id="take-photo-button" class="test-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        viewBox="0 0 16 16" style="vertical-align: text-bottom; margin-right: 5px;">
+                        <path d="M10.5 8.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z" />
+                        <path
+                            d="M2 4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1.172a2 2 0 0 1-1.414-.586l-.828-.828A2 2 0 0 0 9.172 2H6.828a2 2 0 0 0-1.414.586l-.828.828A2 2 0 0 1 3.172 4H2zm.5 2a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1zm9 2.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0z" />
+                    </svg>
+                    拍照识别
+                </button>
+                <button type="button" id="select-image-button">选择截图</button>
+            </div>
+            <div id="ocr-status" style="display: none;"></div>
+        </div>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 1.5rem 0;">
+
+        <form id="sleep-form">
+            <div class="form-group">
+                <label for="api-url">API 地址</label>
+                <input type="url" id="api-url" name="api-url" required
+                    placeholder="例如: https://your-blog.com/usr/plugins/SleepData/simple-api.php">
+            </div>
+            <div class="form-group">
+                <label for="access-token">访问令牌</label>
+                <input type="password" id="access-token" name="access-token" 
+                    placeholder="在这里填写您的访问令牌">
+                <small style="color: #666; margin-top: 5px; display: block;">
+                    此令牌用于验证API访问权限，请填写您在插件配置中设置的令牌
+                </small>
+            </div>
+            <div class="form-group">
+                <label for="date">日期</label>
+                <input type="date" id="date" name="date" required>
+            </div>
+            <div class="form-group">
+                <label>入睡时间</label>
+                <input type="time" id="sleep-time" name="sleep-time" required value="02:22" title="入睡时间">
+            </div>
+            <div class="form-group">
+                <label>醒来时间</label>
+                <input type="time" id="wake-up-time" name="wake-up-time" required value="09:10" title="醒来时间">
+            </div>
+            <div class="form-group">
+                <label for="sleep-score">睡眠分数</label>
+                <input type="number" id="sleep-score" name="sleep-score" required value="83">
+            </div>
+            <div class="form-group">
+                <label>总睡眠 (自动计算)</label>
+                <div class="duration-selector">
+                    <select id="total-sleep-hours" title="总睡眠小时" disabled></select><span>小时</span>
+                    <select id="total-sleep-minutes" title="总睡眠分钟" disabled></select><span>分钟</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>深睡</label>
+                <div class="duration-selector">
+                    <select id="deep-sleep-hours" title="深睡小时"></select><span>小时</span>
+                    <select id="deep-sleep-minutes" title="深睡分钟"></select><span>分钟</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>浅睡</label>
+                <div class="duration-selector">
+                    <select id="light-sleep-hours" title="浅睡小时"></select><span>小时</span>
+                    <select id="light-sleep-minutes" title="浅睡分钟"></select><span>分钟</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>快速眼动</label>
+                <div class="duration-selector">
+                    <select id="rem-sleep-hours" title="快速眼动小时"></select><span>小时</span>
+                    <select id="rem-sleep-minutes" title="快速眼动分钟"></select><span>分钟</span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>清醒</label>
+                <div class="duration-selector">
+                    <select id="awake-minutes" title="清醒分钟"></select><span>分钟</span>
+                </div>
+            </div>
+            <div class="buttons">
+                <button type="submit">发送数据</button>
+            </div>
+        </form>
+        <div id="response-message" class="message"></div>
+        <div id="debug-info" style="margin-top: 20px; font-size: 12px; color: #666; display: none;"></div>
+    </div>
+
+    <script>
+        // 基础URL
+        let baseUrl = '';
+
+        // 自动填充今天的日期
+        const today = new Date();
+        // Format to YYYY-MM-DD for the date input
+        const year = today.getFullYear();
+        const month = (today.getMonth() + 1).toString().padStart(2, '0');
+        const day = today.getDate().toString().padStart(2, '0');
+        document.getElementById('date').value = `${year}-${month}-${day}`;
+
+        // 从localStorage读取上次使用的API地址
+        const savedApiUrl = localStorage.getItem('sleepDataApiUrl');
+        if (savedApiUrl) {
+            document.getElementById('api-url').value = savedApiUrl;
+        } else {
+            // 如果URL为空，设置一个默认值
+            document.getElementById('api-url').value = 'https://your-blog.com/usr/plugins/SleepData/simple-api.php';
+            baseUrl = 'https://your-blog.com/';
+        }
+
+        // 从localStorage读取上次使用的访问令牌
+        const savedAccessToken = localStorage.getItem('sleepDataAccessToken');
+        if (savedAccessToken) {
+            document.getElementById('access-token').value = savedAccessToken;
+        }
+
+        document.getElementById('sleep-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const apiUrl = document.getElementById('api-url').value;
+            const accessToken = document.getElementById('access-token').value;
+            const messageDiv = document.getElementById('response-message');
+            const debugDiv = document.getElementById('debug-info');
+
+            if (!apiUrl) {
+                messageDiv.textContent = '请先填写您的 API 地址！';
+                messageDiv.className = 'message error';
+                messageDiv.style.display = 'block';
+                return;
+            }
+
+            // 保存API地址到localStorage
+            localStorage.setItem('sleepDataApiUrl', apiUrl);
+            // 如果有访问令牌，也保存到localStorage
+            if (accessToken) {
+                localStorage.setItem('sleepDataAccessToken', accessToken);
+            }
+
+            // 尝试提取基础URL
+            const match = apiUrl.match(/(https?:\/\/[^\/]+\/)/);
+            if (match) {
+                baseUrl = match[1];
+            }
+
+            const data = {
+                access_token: accessToken, // 添加访问令牌到请求数据
+                date: document.getElementById('date').value,
+                sleep_time: document.getElementById('sleep-time').value,
+                wake_up_time: document.getElementById('wake-up-time').value,
+                sleep_score: parseInt(document.getElementById('sleep-score').value, 10),
+                total_sleep: formatDuration(
+                    parseInt(document.getElementById('total-sleep-hours').value, 10),
+                    parseInt(document.getElementById('total-sleep-minutes').value, 10)
+                ),
+                deep_sleep: formatDuration(
+                    parseInt(document.getElementById('deep-sleep-hours').value, 10),
+                    parseInt(document.getElementById('deep-sleep-minutes').value, 10)
+                ),
+                light_sleep: formatDuration(
+                    parseInt(document.getElementById('light-sleep-hours').value, 10),
+                    parseInt(document.getElementById('light-sleep-minutes').value, 10)
+                ),
+                rem_sleep: formatDuration(
+                    parseInt(document.getElementById('rem-sleep-hours').value, 10),
+                    parseInt(document.getElementById('rem-sleep-minutes').value, 10)
+                ),
+                awake: `${document.getElementById('awake-minutes').value}分钟`,
+            };
+
+            // 显示加载状态
+            messageDiv.textContent = '正在发送数据...';
+            messageDiv.className = 'message';
+            messageDiv.style.display = 'block';
+            debugDiv.style.display = 'none';
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+                .then(response => {
+                    // 记录响应状态
+                    const status = response.status;
+                    const statusText = response.statusText;
+
+                    // 尝试解析响应为JSON
+                    return response.text().then(text => {
+                        try {
+                            return {
+                                json: JSON.parse(text),
+                                status: status,
+                                statusText: statusText,
+                                text: text
+                            };
+                        } catch (e) {
+                            return {
+                                json: null,
+                                status: status,
+                                statusText: statusText,
+                                text: text,
+                                parseError: e.message
+                            };
+                        }
+                    });
+                })
+                .then(result => {
+                    if (result.status >= 200 && result.status < 300 && result.json && result.json.status === 'success') {
+                        messageDiv.textContent = '成功! ' + (result.json.message || '数据已保存');
+                        messageDiv.className = 'message success';
+
+                        // 显示调试信息，包括数据库错误
+                        let debugHTML = '';
+                        if (result.json.data_file) {
+                            debugHTML += '<strong>数据文件路径:</strong> ' + result.json.data_file + '<br>';
+                        }
+                        if (result.json.db_save === 'failed' && result.json.db_error) {
+                            debugHTML += '<strong style="color: red;">数据库保存失败:</strong> ' + result.json.db_error;
+                        }
+
+                        if (debugHTML) {
+                            debugDiv.innerHTML = debugHTML;
+                            debugDiv.style.display = 'block';
+                        } else {
+                            debugDiv.style.display = 'none';
+                        }
+
+                        // 自动更新日期为明天
+                        const today = new Date();
+                        const tomorrow = new Date(today);
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        const year = tomorrow.getFullYear();
+                        const month = (tomorrow.getMonth() + 1).toString().padStart(2, '0');
+                        const day = tomorrow.getDate().toString().padStart(2, '0');
+                        document.getElementById('date').value = `${year}-${month}-${day}`;
+                    } else {
+                        let errorMsg = '失败! ';
+
+                        if (result.json && result.json.message) {
+                            errorMsg += result.json.message;
+                        } else {
+                            errorMsg += `HTTP错误: ${result.status} ${result.statusText}`;
+                        }
+
+                        messageDiv.textContent = errorMsg;
+                        messageDiv.className = 'message error';
+
+                        // 显示调试信息
+                        debugDiv.innerHTML = '<strong>调试信息:</strong><br>' +
+                            '状态码: ' + result.status + ' ' + result.statusText + '<br>' +
+                            '响应内容: ' + (result.text ? result.text.substring(0, 500) : '无') +
+                            (result.parseError ? '<br>解析错误: ' + result.parseError : '');
+                        debugDiv.style.display = 'block';
+                    }
+                    messageDiv.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    messageDiv.textContent = '发送失败: ' + error.message + '。请检查API地址是否正确，以及网络连接是否正常。';
+                    messageDiv.className = 'message error';
+                    messageDiv.style.display = 'block';
+                });
+        });
+
+        function formatDuration(hours, minutes) {
+            let parts = [];
+            if (hours > 0) {
+                parts.push(`${hours}小时`);
+            }
+            if (minutes > 0) {
+                parts.push(`${minutes}分钟`);
+            }
+            return parts.length > 0 ? parts.join('') : '0分钟';
+        }
+
+        function populateDurationSelectors() {
+            // Populate hour selectors with specific limits
+            for (let i = 0; i <= 11; i++) { // 总睡眠: 12h
+                document.getElementById('total-sleep-hours').add(new Option(i, i));
+            }
+            for (let i = 0; i <= 3; i++) { // 深睡: 4h
+                document.getElementById('deep-sleep-hours').add(new Option(i, i));
+            }
+            for (let i = 0; i <= 7; i++) { // 浅睡: 8h
+                document.getElementById('light-sleep-hours').add(new Option(i, i));
+            }
+            for (let i = 0; i <= 2; i++) { // 快速眼动: 3h
+                document.getElementById('rem-sleep-hours').add(new Option(i, i));
+            }
+
+            // Populate minute selectors
+            const minuteSelectors = document.querySelectorAll('select[id$="-minutes"]');
+            for (let i = 0; i <= 59; i++) {
+                const option = new Option(i.toString().padStart(2, '0'), i);
+                minuteSelectors.forEach(sel => sel.add(option.cloneNode(true)));
+            }
+
+            // Set default values based on the example image
+            document.getElementById('total-sleep-hours').value = 6;
+            document.getElementById('total-sleep-minutes').value = 44;
+            document.getElementById('deep-sleep-hours').value = 1;
+            document.getElementById('deep-sleep-minutes').value = 35;
+            document.getElementById('light-sleep-hours').value = 3;
+            document.getElementById('light-sleep-minutes').value = 38;
+            document.getElementById('rem-sleep-hours').value = 1;
+            document.getElementById('rem-sleep-minutes').value = 31;
+            document.getElementById('awake-minutes').value = 5;
+
+            // Add event listeners for automatic calculation
+            const durationInputs = [
+                'deep-sleep-hours', 'deep-sleep-minutes',
+                'light-sleep-hours', 'light-sleep-minutes',
+                'rem-sleep-hours', 'rem-sleep-minutes',
+                'awake-minutes'
+            ];
+            durationInputs.forEach(id => {
+                document.getElementById(id).addEventListener('change', calculateTotalSleep);
+            });
+
+            // Initial calculation
+            calculateTotalSleep();
+        }
+
+        function calculateTotalSleep() {
+            const deepHours = parseInt(document.getElementById('deep-sleep-hours').value, 10);
+            const deepMinutes = parseInt(document.getElementById('deep-sleep-minutes').value, 10);
+            const lightHours = parseInt(document.getElementById('light-sleep-hours').value, 10);
+            const lightMinutes = parseInt(document.getElementById('light-sleep-minutes').value, 10);
+            const remHours = parseInt(document.getElementById('rem-sleep-hours').value, 10);
+            const remMinutes = parseInt(document.getElementById('rem-sleep-minutes').value, 10);
+
+            const totalMinutes = (deepHours * 60 + deepMinutes) +
+                (lightHours * 60 + lightMinutes) +
+                (remHours * 60 + remMinutes);
+
+            const totalHours = Math.floor(totalMinutes / 60);
+            const remainingMinutes = totalMinutes % 60;
+
+            document.getElementById('total-sleep-hours').value = totalHours;
+            document.getElementById('total-sleep-minutes').value = remainingMinutes;
+        }
+
+        // OCR 功能
+        document.getElementById('take-photo-button').addEventListener('click', function () {
+            document.getElementById('camera-input').click();
+        });
+        document.getElementById('select-image-button').addEventListener('click', function () {
+            document.getElementById('gallery-input').click();
+        });
+
+        const handleFileSelect = async function (event) {
+            const imageFile = event.target.files[0];
+            const statusDiv = document.getElementById('ocr-status');
+            const photoButton = document.getElementById('take-photo-button');
+            const selectButton = document.getElementById('select-image-button');
+
+            if (!imageFile) {
+                return;
+            }
+
+            statusDiv.style.display = 'block';
+            statusDiv.style.color = '#333';
+            photoButton.disabled = true;
+            selectButton.disabled = true;
+
+            try {
+                statusDiv.textContent = '正在压缩图片...';
+                const compressedFile = await compressImage(imageFile);
+
+                const worker = await Tesseract.createWorker('chi_sim+eng', 1, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            statusDiv.innerHTML = `正在识别: ${Math.round(m.progress * 100)}%`;
+                        } else {
+                            statusDiv.innerHTML = `准备中: ${m.status}`;
+                        }
+                        console.log(m);
+                    }
+                });
+
+                await worker.setParameters({
+                    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                });
+
+                const { data: { text } } = await worker.recognize(compressedFile);
+                statusDiv.textContent = '识别完成，正在解析数据...';
+                console.log('识别出的原始文本:', text);
+                parseOcrText(text);
+                await worker.terminate();
+                statusDiv.textContent = '数据已自动填充！请核对后提交。';
+                statusDiv.style.color = 'green';
+            } catch (error) {
+                console.error(error);
+                statusDiv.textContent = '识别失败，请检查浏览器控制台获取错误信息。';
+                statusDiv.style.color = 'red';
+            } finally {
+                photoButton.disabled = false;
+                selectButton.disabled = false;
+                // 重置文件输入，以便可以再次选择相同的文件
+                event.target.value = '';
+            }
+        };
+
+        document.getElementById('camera-input').addEventListener('change', handleFileSelect);
+        document.getElementById('gallery-input').addEventListener('change', handleFileSelect);
+
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                const MAX_WIDTH = 1500;
+                const MAX_HEIGHT = 1500;
+
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = event => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        ctx.canvas.toBlob((blob) => {
+                            resolve(new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            }));
+                        }, 'image/jpeg', 0.9); // 0.9 is quality
+                    };
+                    img.onerror = error => reject(error);
+                };
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function parseOcrText(text) {
+            // 移除所有空格和常见标点，方便匹配
+            const cleanText = text.replace(/[\s。，,“”"|()《》<>、]/g, '');
+
+            // 睡眠分数 (通过排除“分钟”来避免误判)
+            const scoreRegex = /(\d{2})分(?!钟)/i;
+            let scoreMatch = cleanText.match(scoreRegex);
+            if (scoreMatch) {
+                document.getElementById('sleep-score').value = scoreMatch[1];
+            }
+
+            // 日期 (e.g., 7月16日)
+            let dateMatch = cleanText.match(/(\d{1,2})月(\d{1,2})日/);
+            if (dateMatch) {
+                const today = new Date();
+                const year = today.getFullYear(); // Assume current year
+                const month = dateMatch[1].padStart(2, '0');
+                const day = dateMatch[2].padStart(2, '0');
+                document.getElementById('date').value = `${year}-${month}-${day}`;
+            }
+
+            // 睡眠时段 (e.g., 睡眠(02:28-08:58...))
+            let timeMatch = cleanText.match(/睡眠(\d{2}:\d{2})-(\d{2}:\d{2})/);
+            if (timeMatch) {
+                document.getElementById('sleep-time').value = timeMatch[1];
+                document.getElementById('wake-up-time').value = timeMatch[2];
+            }
+
+            // 封装一个更强大的通用解析器
+            const parseTime = (keyword, text) => {
+                // 正则表达式: 关键词 -> 任意非数字字符 -> 小时(可选) -> 分钟(可选)
+                const regex = new RegExp(`${keyword}[^\\d]*?(?:(\\d+)小?时)?(?:(\\d+)分?钟)?`, 'i');
+                const match = text.match(regex);
+                if (match) {
+                    return {
+                        hours: match[1] ? parseInt(match[1], 10) : 0,
+                        minutes: match[2] ? parseInt(match[2], 10) : 0
+                    };
+                }
+                return { hours: 0, minutes: 0 };
+            };
+
+            // 深睡
+            const deepSleep = parseTime('深睡', cleanText);
+            document.getElementById('deep-sleep-hours').value = deepSleep.hours;
+            document.getElementById('deep-sleep-minutes').value = deepSleep.minutes;
+
+            // 浅睡
+            const lightSleep = parseTime('浅睡', cleanText);
+            document.getElementById('light-sleep-hours').value = lightSleep.hours;
+            document.getElementById('light-sleep-minutes').value = lightSleep.minutes;
+
+            // 快速眼动 (REM)
+            const remSleep = parseTime('(?:快速眼动|REM)', cleanText);
+            document.getElementById('rem-sleep-hours').value = remSleep.hours;
+            document.getElementById('rem-sleep-minutes').value = remSleep.minutes;
+
+            // 清醒 (特殊处理，因为它包含 "x次" 等文字，优化结构)
+            const awakeRegex = /清醒(?:(?:\d+)次)?\|?(?:(\d+)小?时)?(?:(\d+)分?钟)?/i;
+            const awakeMatch = cleanText.match(awakeRegex);
+            if (awakeMatch) {
+                const awakeHours = awakeMatch[1] ? parseInt(awakeMatch[1], 10) : 0;
+                const awakeMinutes = awakeMatch[2] ? parseInt(awakeMatch[2], 10) : 0;
+                document.getElementById('awake-minutes').value = (awakeHours * 60) + awakeMinutes;
+            }
+
+            // 解析完成后，自动计算总睡眠
+            calculateTotalSleep();
+        }
+
+        populateDurationSelectors();
+    </script>
+
+</body>
+
+</html>
