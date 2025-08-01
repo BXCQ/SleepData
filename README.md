@@ -28,7 +28,7 @@
 
 ## 最后
 
-具体使用方法请参考插件目录下的。
+具体使用方法请参考文章：https://blog.ybyq.wang/archives/818.html
 
 ## 许可证
 
