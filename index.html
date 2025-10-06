@@ -250,6 +250,9 @@
                 </button>
                 <button type="button" id="select-image-button">选择截图</button>
             </div>
+            <small style="color: #888; display: block; margin-top: 8px; font-size: 0.85em;">
+                💡 提示：首次使用需下载约15MB的识别库，建议在WiFi环境下使用。下载后会自动缓存，之后使用会更快。
+            </small>
             <div id="ocr-status" style="display: none;"></div>
         </div>
         <hr style="border: none; border-top: 1px solid #eee; margin: 1.5rem 0;">
@@ -608,19 +611,51 @@
                 statusDiv.textContent = '正在压缩图片...';
                 const compressedFile = await compressImage(imageFile);
 
-                const worker = await Tesseract.createWorker('chi_sim+eng', 1, {
+                statusDiv.innerHTML = '正在初始化识别引擎...<br><small style="color: #999;">首次使用需下载语言包（约15MB），请耐心等待<br>下载后会缓存，下次使用更快</small>';
+                
+                // 检查是否有本地语言包，如果有则使用本地，否则使用CDN
+                let workerConfig = {
                     logger: m => {
-                        if (m.status === 'recognizing text') {
-                            statusDiv.innerHTML = `正在识别: ${Math.round(m.progress * 100)}%`;
-                        } else {
-                            statusDiv.innerHTML = `准备中: ${m.status}`;
-                        }
                         console.log(m);
+                        if (m.status === 'loading tesseract core') {
+                            statusDiv.innerHTML = `加载识别引擎核心: ${Math.round(m.progress * 100)}%`;
+                        } else if (m.status === 'initializing tesseract') {
+                            statusDiv.innerHTML = `初始化引擎: ${Math.round(m.progress * 100)}%`;
+                        } else if (m.status === 'loading language traineddata') {
+                            const percent = Math.round(m.progress * 100);
+                            statusDiv.innerHTML = `下载中文语言包: ${percent}%<br><small style="color: #999;">文件较大，请稍候...</small>`;
+                        } else if (m.status === 'initializing api') {
+                            statusDiv.innerHTML = `准备识别接口: ${Math.round(m.progress * 100)}%`;
+                        } else if (m.status === 'recognizing text') {
+                            statusDiv.innerHTML = `正在识别文字: ${Math.round(m.progress * 100)}%`;
+                        } else {
+                            statusDiv.innerHTML = `${m.status}: ${Math.round(m.progress * 100)}%`;
+                        }
                     }
-                });
+                };
+                
+                // 尝试使用本地语言包，如果失败则使用CDN
+                try {
+                    // 先尝试从本地加载
+                    const localCheck = await fetch('./tessdata/chi_sim.traineddata.gz');
+                    if (localCheck.ok) {
+                        workerConfig.langPath = './tessdata';
+                        statusDiv.innerHTML = '使用本地语言包，加载更快 ⚡';
+                    } else {
+                        throw new Error('本地语言包不存在');
+                    }
+                } catch (e) {
+                    // 使用CDN
+                    workerConfig.langPath = 'https://unpkg.com/tesseract.js-core@v5.0.0/tessdata';
+                }
+                
+                const worker = await Tesseract.createWorker('chi_sim', 1, workerConfig);
 
+                // 优化识别参数
                 await worker.setParameters({
                     tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
+                    tessedit_char_whitelist: '0123456789:分钟小时深睡浅快速眼动清醒次-|月日睡眠质量一般时长不足为会影响尔蒙泌导致食欲增加和代谢减慢从而体重超越同龄人',  // 限定字符集提高准确度
+                    tessedit_ocr_engine_mode: Tesseract.OEM.LSTM_ONLY,  // 使用LSTM引擎，准确度更高
                 });
 
                 const { data: { text } } = await worker.recognize(compressedFile);
@@ -628,11 +663,11 @@
                 console.log('识别出的原始文本:', text);
                 parseOcrText(text);
                 await worker.terminate();
-                statusDiv.textContent = '数据已自动填充！请核对后提交。';
+                statusDiv.textContent = '✓ 数据已自动填充！请核对后提交。';
                 statusDiv.style.color = 'green';
             } catch (error) {
                 console.error(error);
-                statusDiv.textContent = '识别失败，请检查浏览器控制台获取错误信息。';
+                statusDiv.innerHTML = `识别失败: ${error.message}<br><small style="color: #999;">请检查网络连接或稍后重试</small>`;
                 statusDiv.style.color = 'red';
             } finally {
                 photoButton.disabled = false;
@@ -647,8 +682,8 @@
 
         function compressImage(file) {
             return new Promise((resolve, reject) => {
-                const MAX_WIDTH = 1500;
-                const MAX_HEIGHT = 1500;
+                const MAX_WIDTH = 2000;  // 提高分辨率以保留更多细节
+                const MAX_HEIGHT = 2000;
 
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -675,14 +710,36 @@
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
+                        
+                        // 绘制图像
                         ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // === 图像预处理优化 ===
+                        const imageData = ctx.getImageData(0, 0, width, height);
+                        const data = imageData.data;
+                        
+                        // 1. 增强对比度和锐化
+                        for (let i = 0; i < data.length; i += 4) {
+                            // 转为灰度
+                            const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                            
+                            // 增强对比度 (提高1.3倍)
+                            let enhanced = ((gray - 128) * 1.3) + 128;
+                            
+                            // 二值化处理 (阈值130)
+                            enhanced = enhanced > 130 ? 255 : 0;
+                            
+                            data[i] = data[i + 1] = data[i + 2] = enhanced;
+                        }
+                        
+                        ctx.putImageData(imageData, 0, 0);
 
                         ctx.canvas.toBlob((blob) => {
                             resolve(new File([blob], file.name, {
-                                type: 'image/jpeg',
+                                type: 'image/png',  // 使用PNG保留更多细节
                                 lastModified: Date.now()
                             }));
-                        }, 'image/jpeg', 0.9); // 0.9 is quality
+                        }, 'image/png'); // 使用PNG格式
                     };
                     img.onerror = error => reject(error);
                 };
@@ -690,9 +747,76 @@
             });
         }
 
+        // 转义正则表达式特殊字符
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        // OCR结果后处理：修正常见识别错误
+        function correctOcrErrors(text) {
+            let corrected = text;
+            
+            // 数字识别错误修正
+            const corrections = {
+                // 常见的数字混淆
+                'S': '5',    // S常被识别为5
+                's': '5',
+                'B': '8',    // B常被识别为8
+                'O': '0',    // O常被识别为0
+                'o': '0',
+                'l': '1',    // 小写l常被识别为1
+                'I': '1',    // 大写I常被识别为1
+                'Z': '2',    // Z有时被识别为2
+                '§': '3',    // 特殊符号可能被识别为3
+                '¥': '3',
+                'E': '3',    // E有时被识别为3
+                'A': '4',    // A有时被识别为4
+                'G': '6',    // G有时被识别为6
+                'T': '7',    // T有时被识别为7
+                '?': '7',
+                'g': '9',    // g有时被识别为9
+            };
+            
+            // 在数字上下文中替换（例如在时间、分钟、分数附近）
+            Object.keys(corrections).forEach(wrong => {
+                const right = corrections[wrong];
+                const escapedWrong = escapeRegExp(wrong);  // 转义特殊字符
+                
+                // 替换在数字、时间、分数等上下文中的错误字符
+                corrected = corrected.replace(new RegExp(`(\\d+)${escapedWrong}`, 'g'), `$1${right}`);
+                corrected = corrected.replace(new RegExp(`${escapedWrong}(\\d+)`, 'g'), `${right}$1`);
+                corrected = corrected.replace(new RegExp(`${escapedWrong}分`, 'g'), `${right}分`);
+                corrected = corrected.replace(new RegExp(`${escapedWrong}:`, 'g'), `${right}:`);
+                corrected = corrected.replace(new RegExp(`:${escapedWrong}`, 'g'), `:${right}`);
+                corrected = corrected.replace(new RegExp(`${escapedWrong}小时`, 'g'), `${right}小时`);
+            });
+            
+            // 特别针对3和5的混淆修正
+            // 在"X小时X分钟"的上下文中，如果出现非数字，尝试修正
+            corrected = corrected.replace(/([^\d\s])小时/g, (match, char) => {
+                if (char === 'з' || char === 'З') return '3小时';
+                if (char === 'ъ' || char === 'э') return '3小时';
+                return match;
+            });
+            
+            corrected = corrected.replace(/([^\d\s])分钟/g, (match, char) => {
+                if (char === 'з' || char === 'З') return '3分钟';
+                if (char === 'ъ' || char === 'э') return '3分钟';
+                if (char === 'Б' || char === 'б') return '5分钟';
+                return match;
+            });
+            
+            return corrected;
+        }
+
         function parseOcrText(text) {
+            // 先进行错误修正
+            const correctedText = correctOcrErrors(text);
+            console.log('原始识别文本:', text);
+            console.log('修正后文本:', correctedText);
+            
             // 移除所有空格和常见标点，方便匹配
-            const cleanText = text.replace(/[\s。，,“”"|()《》<>、]/g, '');
+            const cleanText = correctedText.replace(/[\s。，,"""|()《》<>、]/g, '');
 
             // 睡眠分数 (通过排除“分钟”来避免误判)
             const scoreRegex = /(\d{2})分(?!钟)/i;
