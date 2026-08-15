@@ -20,10 +20,16 @@ OPPO 手表 → OPPO 健康 → 授权同步到苹果「健康」→ 快捷指�
    - 访问令牌：与插件后台一致
 4. 允许读取健康数据后，可在「自动化」里设每天早上运行。
 
-若提示未签名 / 无法导入：
+若提示未签名 / 无法导入 / **快捷指令 URL 无效**：
 
-- 设置 → 快捷指令 → 高级 → 允许未信任的快捷指令  
-- 或在导入页点「下载 .shortcut 文件」，用「文件」App 打开
+- **不要依赖在线 `shortcuts://import-shortcut`**（国内访问 GitHub 常失败，且未签名文件会被系统拒绝）
+- 用 iPhone Safari 打开本地页 `install-shortcut-local.html`（可先传到手机），点 **「下载快捷指令到文件」**
+- 再到「文件」App 打开 `.shortcut`，用快捷指令导入
+- 设置 → 快捷指令 → 高级 → 允许未信任的快捷指令
+
+也可在电脑打开预览页（内嵌了指令文件，不依赖博客）：  
+https://htmlpreview.github.io/?https://github.com/BXCQ/SleepData/blob/cursor/shortcuts-sleep-api-b98f/install-shortcut-local.html  
+（请用手机 Safari 打开该链接）
 
 快捷指令源文件：`shortcuts/SleepData-AutoUpload.shortcut`（可用同目录 `generate_shortcut.py` 重新生成）。
 
