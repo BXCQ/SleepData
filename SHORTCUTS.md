@@ -12,11 +12,11 @@ OPPO 手表 → OPPO 健康 → 授权同步到苹果「健康」→ 快捷指�
 
 1. **用 iPhone Safari** 打开：
 
-   `https://你的博客/usr/plugins/SleepData/install-shortcut.html`
+   `https://blog.ybyq.wang/usr/plugins/SleepData/install-shortcut.html`
 
 2. 点 **「打开快捷指令并导入」**，在系统弹窗里添加「睡眠数据自动上传」。
 3. 首次运行时填写：
-   - API：`https://你的博客/usr/plugins/SleepData/shortcut-api.php`
+   - API：`https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php`
    - 访问令牌：与插件后台一致
 4. 允许读取健康数据后，可在「自动化」里设每天早上运行。
 
@@ -42,7 +42,7 @@ OPPO 手表 → OPPO 健康 → 授权同步到苹果「健康」→ 快捷指�
 ## 接口地址
 
 ```text
-https://你的博客域名/usr/plugins/SleepData/shortcut-api.php
+https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php
 ```
 
 - 方法：`POST`
@@ -161,7 +161,7 @@ OPPO 若只同步「Asleep」而无细分阶段，会记入浅睡，保证总时
 ## 用 curl 自测
 
 ```bash
-curl -X POST 'https://你的域名/usr/plugins/SleepData/shortcut-api.php' \
+curl -X POST 'https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php' \
   -H 'Content-Type: application/json' \
   -d '{
     "access_token": "你的令牌",

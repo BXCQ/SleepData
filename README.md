@@ -22,7 +22,7 @@
 
 ### 方式一：手动 OCR 上传
 
-1. 在浏览器中打开 `https://博客地址/usr/plugins/SleepData/index.html`
+1. 在浏览器中打开 `https://blog.ybyq.wang/usr/plugins/SleepData/index.html`
 2. 填写 **API 地址** 和 **访问令牌**（浏览器会记住）
 3. 拍照或选择健康 App 截图，OCR 识别后核对并发送
 
@@ -30,9 +30,9 @@
 
 适用于：OPPO 手表数据已同步到苹果「健康」。
 
-1. **iPhone Safari** 打开：`https://博客地址/usr/plugins/SleepData/install-shortcut.html`
+1. **iPhone Safari** 打开：`https://blog.ybyq.wang/usr/plugins/SleepData/install-shortcut.html`
 2. 点「打开快捷指令并导入」，添加后填写 API 与令牌
-3. 也可直接调用：`https://博客地址/usr/plugins/SleepData/shortcut-api.php`
+3. 也可直接调用：`https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php`
 4. 详细说明见 [SHORTCUTS.md](./SHORTCUTS.md)
 
 > 说明：苹果 Sleep Score / OPPO 健康分数通常无法被快捷指令读取；未传分数时接口会估算，也可在 JSON 里手动带 `sleep_score`。

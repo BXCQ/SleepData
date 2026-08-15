@@ -91,7 +91,7 @@ def build() -> dict:
                 "UUID": ask_url,
                 "WFAskActionPrompt": "睡眠数据 API 地址（shortcut-api.php）",
                 "WFInputType": "URL",
-                "WFAskActionDefaultURL": "https://你的博客/usr/plugins/SleepData/shortcut-api.php",
+                "WFAskActionDefaultURL": "https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php",
             },
         }
     )
@@ -447,7 +447,7 @@ def build() -> dict:
                 "Category": "Parameter",
                 "ParameterKey": "WFAskActionDefaultURL",
                 "Text": "填写你的 shortcut-api.php 完整地址",
-                "DefaultValue": "https://你的博客/usr/plugins/SleepData/shortcut-api.php",
+                "DefaultValue": "https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php",
             }
         ],
         "WFWorkflowActions": actions,
