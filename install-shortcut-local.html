@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>导入睡眠数据快捷指令（无需博客部署）</title>
+  <style>
+    :root {
+      --bg: #e8f3ff;
+      --card: #ffffff;
+      --ink: #10233f;
+      --muted: #5b6b82;
+      --accent: #0a84ff;
+      --accent-dark: #0060df;
+      --ok: #1f8f4e;
+      --line: #d7e3f4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #cfe6ff 0%, transparent 55%),
+        radial-gradient(900px 420px at 100% 0%, #dff7ff 0%, transparent 50%),
+        var(--bg);
+      padding: 28px 18px 48px;
+    }
+    .wrap { width: min(560px, 100%); margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 1.7rem; letter-spacing: -0.02em; }
+    .lead { margin: 0 0 22px; color: var(--muted); line-height: 1.5; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(16, 35, 63, 0.06);
+      margin-bottom: 14px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      text-decoration: none;
+      border: none;
+      border-radius: 14px;
+      padding: 16px 18px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .btn-primary {
+      color: #fff;
+      background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+    }
+    .btn-secondary {
+      color: var(--ink);
+      background: #f3f7fc;
+      border: 1px solid var(--line);
+    }
+    .hint, ol { font-size: 0.92rem; color: var(--muted); line-height: 1.55; }
+    ol { margin: 8px 0 0; padding-left: 1.2rem; }
+    code {
+      font-size: 0.86em;
+      background: #eef4fb;
+      padding: 1px 6px;
+      border-radius: 6px;
+      word-break: break-all;
+    }
+    .status {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #eef8f1;
+      color: #1f6b3d;
+      font-size: 0.92rem;
+    }
+    .status.warn { background: #fff6e8; color: #8a5a00; }
+    .ok { color: var(--ok); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>睡眠数据自动上传</h1>
+    <p class="lead">
+      不依赖博客是否已合并代码。<br>
+      快捷指令文件从 GitHub 拉取；导入后 API 仍指向
+      <code>blog.ybyq.wang</code>。
+    </p>
+
+    <div class="card">
+      <a id="open-import" class="btn btn-primary" href="#">打开快捷指令并导入</a>
+      <a id="download-file" class="btn btn-secondary" href="#" download="SleepData-AutoUpload.shortcut">下载 .shortcut 文件</a>
+      <p id="status" class="status"></p>
+      <p class="hint">请用 <span class="ok">iPhone Safari</span> 打开本页（可 AirDrop 此 HTML 到手机，用「文件」→ Safari 打开）。</p>
+    </div>
+
+    <div class="card">
+      <strong>导入后填写</strong>
+      <ol>
+        <li>API：<code>https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php</code></li>
+        <li>访问令牌：插件后台配置的令牌</li>
+        <li>允许读取「健康」睡眠数据</li>
+      </ol>
+      <p class="hint" style="margin-top:10px">
+        注意：若服务器还没合并 PR，<code>shortcut-api.php</code> 还不存在，导入快捷指令可以先完成；接口部署后再运行上传。
+      </p>
+    </div>
+
+    <div class="card">
+      <strong>若提示无法导入</strong>
+      <ol>
+        <li>设置 → 快捷指令 → 高级 → 允许未信任的快捷指令</li>
+        <li>或先下载 .shortcut，用「文件」App 打开</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // 未合并到博客时，直接用 GitHub 分支上的文件
+      var fileUrl = 'https://raw.githubusercontent.com/BXCQ/SleepData/cursor/shortcuts-sleep-api-b98f/shortcuts/SleepData-AutoUpload.shortcut';
+      var importUrl = 'shortcuts://import-shortcut?url=' + encodeURIComponent(fileUrl);
+      var openBtn = document.getElementById('open-import');
+      var downloadBtn = document.getElementById('download-file');
+      var statusEl = document.getElementById('status');
+
+      openBtn.setAttribute('href', importUrl);
+      downloadBtn.setAttribute('href', fileUrl);
+
+      function show(msg, warn) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = msg;
+        statusEl.className = 'status' + (warn ? ' warn' : '');
+      }
+
+      openBtn.addEventListener('click', function () {
+        show('正在打开「快捷指令」…');
+        setTimeout(function () { window.location.href = importUrl; }, 40);
+      });
+
+      if (!/iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
+        show('请用 iPhone/iPad Safari 打开本页后再点导入。', true);
+      }
+    })();
+  </script>
+</body>
+</html>
