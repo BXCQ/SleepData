@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>导入睡眠数据快捷指令</title>
+  <style>
+    :root {
+      --bg: #e8f3ff;
+      --card: #ffffff;
+      --ink: #10233f;
+      --muted: #5b6b82;
+      --accent: #0a84ff;
+      --accent-dark: #0060df;
+      --ok: #1f8f4e;
+      --line: #d7e3f4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #cfe6ff 0%, transparent 55%),
+        radial-gradient(900px 420px at 100% 0%, #dff7ff 0%, transparent 50%),
+        var(--bg);
+      padding: 28px 18px 48px;
+    }
+    .wrap {
+      width: min(560px, 100%);
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.7rem;
+      letter-spacing: -0.02em;
+    }
+    .lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(16, 35, 63, 0.06);
+      margin-bottom: 14px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      text-decoration: none;
+      border: none;
+      border-radius: 14px;
+      padding: 16px 18px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .btn-primary {
+      color: #fff;
+      background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+    }
+    .btn-secondary {
+      color: var(--ink);
+      background: #f3f7fc;
+      border: 1px solid var(--line);
+    }
+    .hint {
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 0;
+    }
+    .ok {
+      color: var(--ok);
+      font-weight: 600;
+    }
+    ol {
+      margin: 8px 0 0;
+      padding-left: 1.2rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    code {
+      font-size: 0.86em;
+      background: #eef4fb;
+      padding: 1px 6px;
+      border-radius: 6px;
+    }
+    .status {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #eef8f1;
+      color: #1f6b3d;
+      font-size: 0.92rem;
+    }
+    .warn {
+      background: #fff6e8;
+      color: #8a5a00;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>睡眠数据自动上传</h1>
+    <p class="lead">在 iPhone 上打开本页，点下方按钮即可跳转到「快捷指令」导入。<br>站点：<code>blog.ybyq.wang</code></p>
+
+    <div class="card">
+      <a id="open-import" class="btn btn-primary" href="#">打开快捷指令并导入</a>
+      <a id="download-file" class="btn btn-secondary" href="./shortcuts/SleepData-AutoUpload.shortcut" download>下载 .shortcut 文件</a>
+      <p id="status" class="status"></p>
+      <p class="hint">请用 <span class="ok">Safari / iPhone</span> 打开。电脑浏览器无法直接装到手机快捷指令里。</p>
+    </div>
+
+    <div class="card">
+      <strong>导入后怎么用</strong>
+      <ol>
+        <li>首次运行允许读取「健康」睡眠数据。</li>
+        <li>填写 API 地址：<code>https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php</code></li>
+        <li>填写插件里的访问令牌。</li>
+        <li>在「自动化」里设每天早上运行本快捷指令。</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <strong>若提示无法导入 / 未签名</strong>
+      <ol>
+        <li>设置 → 快捷指令 → 打开「高级」→ 允许未信任的快捷指令。</li>
+        <li>或先点「下载 .shortcut 文件」，到「文件」App 中打开，选择用快捷指令打开。</li>
+        <li>仍失败时，按 <code>SHORTCUTS.md</code> 手动搭建（约 5 分钟）。</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var openBtn = document.getElementById('open-import');
+      var statusEl = document.getElementById('status');
+      var downloadBtn = document.getElementById('download-file');
+
+      // 博客未部署时，回退到 GitHub 分支上的 .shortcut
+      var githubShortcut = 'https://raw.githubusercontent.com/BXCQ/SleepData/cursor/shortcuts-sleep-api-b98f/shortcuts/SleepData-AutoUpload.shortcut';
+      var localShortcut = new URL('./shortcuts/SleepData-AutoUpload.shortcut', window.location.href).href;
+      var onBlog = /(^|\.)blog\.ybyq\.wang$/i.test(window.location.hostname);
+      var fileUrl = onBlog ? localShortcut : githubShortcut;
+      var importUrl = 'shortcuts://import-shortcut?url=' + encodeURIComponent(fileUrl);
+
+      openBtn.href = importUrl;
+      downloadBtn.href = fileUrl;
+
+      function show(msg, warn) {
+        statusEl.style.display = 'block';
+        statusEl.textContent = msg;
+        statusEl.className = 'status' + (warn ? ' warn' : '');
+      }
+
+      openBtn.addEventListener('click', function (e) {
+        // Keep default navigation to shortcuts:// so iOS can hand off.
+        show('正在尝试打开「快捷指令」… 若无反应，请改用下方下载。');
+        // Extra attempt for some WebViews
+        setTimeout(function () {
+          window.location.href = importUrl;
+        }, 50);
+      });
+
+      // Auto-detect non-iOS
+      var ua = navigator.userAgent || '';
+      var isIOS = /iPhone|iPad|iPod/i.test(ua);
+      if (!isIOS) {
+        show('检测到当前不是 iPhone/iPad。请用手机 Safari 打开本页后再点导入。', true);
+      }
+    })();
+  </script>
+</body>
+</html>
