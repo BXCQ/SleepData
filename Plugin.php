@@ -126,6 +126,30 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
     }
 
     /**
+     * 获取最近一条睡眠数据（主题侧边栏等会调用此方法）
+     * 优先返回今天的记录；今天没有则返回按日期最新的一条。
+     * @return array|null
+     */
+    public static function getLatestSleepData()
+    {
+        try {
+            $todayData = self::getTodaySleepData();
+            if (!empty($todayData)) {
+                return $todayData;
+            }
+
+            $db = Typecho_Db::get();
+            $prefix = $db->getPrefix();
+            $tableName = $prefix . 'sleep_data';
+            return $db->fetchRow(
+                $db->select()->from($tableName)->order('date', Typecho_Db::SORT_DESC)->limit(1)
+            );
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * 获取图表和统计所需的数据
      * @param int $days
      * @return array|null
