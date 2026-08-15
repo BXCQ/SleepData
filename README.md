@@ -30,9 +30,10 @@
 
 适用于：OPPO 手表数据已同步到苹果「健康」。
 
-1. 接口：`https://博客地址/usr/plugins/SleepData/shortcut-api.php`
-2. 按 [SHORTCUTS.md](./SHORTCUTS.md) 在 iPhone 上配置快捷指令与每日自动化
-3. 每天定时把昨晚睡眠样本 POST 到服务器，自动入库
+1. **iPhone Safari** 打开：`https://博客地址/usr/plugins/SleepData/install-shortcut.html`
+2. 点「打开快捷指令并导入」，添加后填写 API 与令牌
+3. 也可直接调用：`https://博客地址/usr/plugins/SleepData/shortcut-api.php`
+4. 详细说明见 [SHORTCUTS.md](./SHORTCUTS.md)
 
 > 说明：苹果 Sleep Score / OPPO 健康分数通常无法被快捷指令读取；未传分数时接口会估算，也可在 JSON 里手动带 `sleep_score`。
 

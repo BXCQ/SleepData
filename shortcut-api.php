@@ -104,6 +104,29 @@ try {
     $aggregated = null;
     $source = 'fields';
 
+    // 快捷指令简化格式：每行 stage|start|end
+    if (empty($data['samples']) && !empty($data['samples_text']) && is_string($data['samples_text'])) {
+        $parsedSamples = [];
+        foreach (preg_split('/\r\n|\r|\n/', $data['samples_text']) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $parts = explode('|', $line);
+            if (count($parts) < 3) {
+                continue;
+            }
+            $parsedSamples[] = [
+                'stage' => trim($parts[0]),
+                'start' => trim($parts[1]),
+                'end' => trim($parts[2]),
+            ];
+        }
+        if (!empty($parsedSamples)) {
+            $data['samples'] = $parsedSamples;
+        }
+    }
+
     // 方式一：原始样本（推荐）
     $samples = $data['samples'] ?? $data['sleep_samples'] ?? $data['sleep'] ?? null;
     if (is_array($samples) && !empty($samples)) {
