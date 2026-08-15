@@ -3,24 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>导入睡眠数据快捷指令（无需博客部署）</title>
+  <title>导入睡眠数据快捷指令（本地）</title>
   <style>
     :root {
-      --bg: #e8f3ff;
-      --card: #ffffff;
-      --ink: #10233f;
-      --muted: #5b6b82;
-      --accent: #0a84ff;
-      --accent-dark: #0060df;
-      --ok: #1f8f4e;
-      --line: #d7e3f4;
+      --bg: #e8f3ff; --card: #fff; --ink: #10233f; --muted: #5b6b82;
+      --accent: #0a84ff; --accent-dark: #0060df; --ok: #1f8f4e; --line: #d7e3f4;
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
-      color: var(--ink);
+      margin: 0; min-height: 100vh; color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
       background:
         radial-gradient(1200px 500px at 10% -10%, #cfe6ff 0%, transparent 55%),
         radial-gradient(900px 420px at 100% 0%, #dff7ff 0%, transparent 50%),
@@ -28,108 +20,137 @@
       padding: 28px 18px 48px;
     }
     .wrap { width: min(560px, 100%); margin: 0 auto; }
-    h1 { margin: 0 0 8px; font-size: 1.7rem; letter-spacing: -0.02em; }
-    .lead { margin: 0 0 22px; color: var(--muted); line-height: 1.5; }
+    h1 { margin: 0 0 8px; font-size: 1.65rem; letter-spacing: -0.02em; }
+    .lead { margin: 0 0 20px; color: var(--muted); line-height: 1.5; }
     .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 20px;
-      box-shadow: 0 10px 30px rgba(16, 35, 63, 0.06);
-      margin-bottom: 14px;
+      background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+      padding: 20px; box-shadow: 0 10px 30px rgba(16,35,63,.06); margin-bottom: 14px;
     }
     .btn {
-      display: block;
-      width: 100%;
-      text-align: center;
-      text-decoration: none;
-      border: none;
-      border-radius: 14px;
-      padding: 16px 18px;
-      font-size: 1.05rem;
-      font-weight: 700;
-      cursor: pointer;
-      margin-bottom: 10px;
+      display: block; width: 100%; text-align: center; text-decoration: none; border: none;
+      border-radius: 14px; padding: 16px 18px; font-size: 1.05rem; font-weight: 700;
+      cursor: pointer; margin-bottom: 10px;
     }
-    .btn-primary {
-      color: #fff;
-      background: linear-gradient(180deg, var(--accent), var(--accent-dark));
-    }
-    .btn-secondary {
-      color: var(--ink);
-      background: #f3f7fc;
-      border: 1px solid var(--line);
-    }
-    .hint, ol { font-size: 0.92rem; color: var(--muted); line-height: 1.55; }
-    ol { margin: 8px 0 0; padding-left: 1.2rem; }
-    code {
-      font-size: 0.86em;
-      background: #eef4fb;
-      padding: 1px 6px;
-      border-radius: 6px;
-      word-break: break-all;
-    }
-    .status {
-      display: none;
-      margin-top: 12px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: #eef8f1;
-      color: #1f6b3d;
-      font-size: 0.92rem;
-    }
-    .status.warn { background: #fff6e8; color: #8a5a00; }
+    .btn-primary { color: #fff; background: linear-gradient(180deg, var(--accent), var(--accent-dark)); }
+    .btn-secondary { color: var(--ink); background: #f3f7fc; border: 1px solid var(--line); }
+    .hint, ol { font-size: 0.92rem; color: var(--muted); line-height: 1.55; margin: 0; }
+    ol { margin-top: 8px; padding-left: 1.2rem; }
+    code { font-size: .86em; background: #eef4fb; padding: 1px 6px; border-radius: 6px; word-break: break-all; }
+    .status { display:none; margin-top:12px; padding:10px 12px; border-radius:10px; background:#eef8f1; color:#1f6b3d; font-size:.92rem; }
+    .status.warn { background:#fff6e8; color:#8a5a00; }
     .ok { color: var(--ok); font-weight: 600; }
+    .stepnum { display:inline-block; width:1.4em; height:1.4em; line-height:1.4em; text-align:center;
+      border-radius:50%; background:#e8f1ff; color:var(--accent-dark); font-size:.8rem; font-weight:700; margin-right:6px; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>睡眠数据自动上传</h1>
     <p class="lead">
-      不依赖博客是否已合并代码。<br>
-      快捷指令文件从 GitHub 拉取；导入后 API 仍指向
-      <code>blog.ybyq.wang</code>。
+      不走 GitHub 在线导入（国内常失败 / 未签名会被拒）。<br>
+      本页已内嵌快捷指令文件，请按下面步骤安装。
     </p>
 
     <div class="card">
-      <a id="open-import" class="btn btn-primary" href="#">打开快捷指令并导入</a>
-      <a id="download-file" class="btn btn-secondary" href="#" download="SleepData-AutoUpload.shortcut">下载 .shortcut 文件</a>
+      <button id="download-btn" class="btn btn-primary" type="button">① 下载快捷指令到「文件」</button>
+      <a id="try-import" class="btn btn-secondary" href="#">② 备用：尝试系统导入（可能失败）</a>
       <p id="status" class="status"></p>
-      <p class="hint">请用 <span class="ok">iPhone Safari</span> 打开本页（可 AirDrop 此 HTML 到手机，用「文件」→ Safari 打开）。</p>
+      <p class="hint" style="margin-top:10px">请用 <span class="ok">iPhone Safari</span> 打开本页。</p>
+    </div>
+
+    <div class="card">
+      <strong>下载后怎么打开</strong>
+      <ol>
+        <li><span class="stepnum">1</span>打开系统「文件」App</li>
+        <li><span class="stepnum">2</span>找到 <code>SleepData-AutoUpload.shortcut</code>（一般在「下载」）</li>
+        <li><span class="stepnum">3</span>点文件 → 用「快捷指令」打开 / 分享到快捷指令</li>
+        <li><span class="stepnum">4</span>若提示未信任：设置 → 快捷指令 → 高级 → 允许未信任的快捷指令</li>
+      </ol>
     </div>
 
     <div class="card">
       <strong>导入后填写</strong>
       <ol>
         <li>API：<code>https://blog.ybyq.wang/usr/plugins/SleepData/shortcut-api.php</code></li>
-        <li>访问令牌：插件后台配置的令牌</li>
-        <li>允许读取「健康」睡眠数据</li>
+        <li>访问令牌：插件后台配置</li>
+        <li>允许读取健康「睡眠」数据</li>
       </ol>
-      <p class="hint" style="margin-top:10px">
-        注意：若服务器还没合并 PR，<code>shortcut-api.php</code> 还不存在，导入快捷指令可以先完成；接口部署后再运行上传。
-      </p>
-    </div>
-
-    <div class="card">
-      <strong>若提示无法导入</strong>
-      <ol>
-        <li>设置 → 快捷指令 → 高级 → 允许未信任的快捷指令</li>
-        <li>或先下载 .shortcut，用「文件」App 打开</li>
-      </ol>
+      <p class="hint" style="margin-top:10px">服务器尚未合并时，可先装好快捷指令；合并部署 <code>shortcut-api.php</code> 后再运行上传。</p>
     </div>
   </div>
 
   <script>
     (function () {
-      // 未合并到博客时，直接用 GitHub 分支上的文件
-      var fileUrl = 'https://raw.githubusercontent.com/BXCQ/SleepData/cursor/shortcuts-sleep-api-b98f/shortcuts/SleepData-AutoUpload.shortcut';
-      var importUrl = 'shortcuts://import-shortcut?url=' + encodeURIComponent(fileUrl);
-      var openBtn = document.getElementById('open-import');
-      var downloadBtn = document.getElementById('download-file');
-      var statusEl = document.getElementById('status');
+      var B64 = '
+YnBsaXN0MDDcAAEAAgADAAQABQAGAAcACAAJAAoACwAMAA0A/AD9AGUA/gEDAQsBHAEdAR4BHwEgXxARV0ZXb3JrZmxvd0FjdGlvbnNfEBdXRldvcmtmbG93' +
+      'Q2xpZW50UmVsZWFzZV8QF1dGV29ya2Zsb3dDbGllbnRWZXJzaW9uXxAbV0ZXb3JrZmxvd0hhc091dHB1dEZhbGxiYWNrXldGV29ya2Zsb3dJY29uXxAZV0ZX' +
+      'b3JrZmxvd0ltcG9ydFF1ZXN0aW9uc18QIVdGV29ya2Zsb3dJbnB1dENvbnRlbnRJdGVtQ2xhc3Nlc18QHldGV29ya2Zsb3dNaW5pbXVtQ2xpZW50VmVyc2lv' +
+      'bl8QJFdGV29ya2Zsb3dNaW5pbXVtQ2xpZW50VmVyc2lvblN0cmluZ15XRldvcmtmbG93TmFtZV8QIldGV29ya2Zsb3dPdXRwdXRDb250ZW50SXRlbUNsYXNz' +
+      'ZXNfEA9XRldvcmtmbG93VHlwZXOvEBUADgAbACwAMQA3ADsASABPAHUAewCBAIsAlQCaAKIAqACtAL0AwwDHAPXSAA8AEAARABJfEBpXRldvcmtmbG93QWN0' +
+      'aW9uSWRlbnRpZmllcl8QGldGV29ya2Zsb3dBY3Rpb25QYXJhbWV0ZXJzXxAXaXMud29ya2Zsb3cuYWN0aW9ucy5hc2vUABMAFAAVABYAFwAYABkAGlRVVUlE' +
+      'XxAVV0ZBc2tBY3Rpb25EZWZhdWx0VVJMXxARV0ZBc2tBY3Rpb25Qcm9tcHRbV0ZJbnB1dFR5cGVfECQyREVCMDRBNy02OEUzLTQ1MEEtQjNBNy0zMkZFMjM3' +
+      'ODFGRjRfED1odHRwczovL2Jsb2cueWJ5cS53YW5nL3Vzci9wbHVnaW5zL1NsZWVwRGF0YS9zaG9ydGN1dC1hcGkucGhwbxAdd2F3IGVwY24AIABBAFAASQAg' +
+      'VzBXQP8IAHMAaABvAHIAdABjAHUAdAAtAGEAcABpAC4AcABoAHD/CVNVUkzSAA8AEAAcAB1fEB9pcy53b3JrZmxvdy5hY3Rpb25zLnNldHZhcmlhYmxl0wAT' +
+      'AB4AHwAgACEAK1dXRklucHV0XldGVmFyaWFibGVOYW1lXxAkMjczNTk3ODItNjg1Qy00RjhBLTkzNUUtMzNENzQxMzU0QUY20gAiACMAJAAqVVZhbHVlXxAT' +
+      'V0ZTZXJpYWxpemF0aW9uVHlwZdMAJQAmACcAKAAXAClaT3V0cHV0TmFtZVpPdXRwdXRVVUlEVFR5cGVeUHJvdmlkZWQgSW5wdXRcQWN0aW9uT3V0cHV0XxAV' +
+      'V0ZUZXh0VG9rZW5BdHRhY2htZW50VkFQSVVSTNIADwAQABEALdMAEwAVABYALgAvADBfECRCQzlCNDZEMy03RkY5LTQ4QTgtQTVGQi0yRjVENzQ2QzVBMTNt' +
+      'i7+V7k7kckz/CE4OY9JO9pFNf25OAIH0/wlUVGV4dNIADwAQABwAMtMAEwAeAB8AMwA0ADZfECQ1RDYxQ0U0Qi0xQ0Q0LTQ5N0YtQTlCOC0xMkI2RDY1ODg4' +
+      'NjbSACIAIwA1ACrTACUAJgAnACgALgApVVRva2Vu0gAPABAAOAA5XxAfaXMud29ya2Zsb3cuYWN0aW9ucy5jdXJyZW50ZGF0ZdEAEwA6XxAkN0Y5QjgxNUMt' +
+      'RDYzRi00QjBGLUI2MEEtRkEwRUQ5Mzk1NzYy0gAPABAAPAA9XxAfaXMud29ya2Zsb3cuYWN0aW9ucy5mb3JtYXQuZGF0ZdUAEwA+AD8AHgBAAEEAQgBDAEQA' +
+      'R1xXRkRhdGVGb3JtYXRfEBFXRkRhdGVGb3JtYXRTdHlsZV8QEVdGVGltZUZvcm1hdFN0eWxlXxAkNkY1MzA0RjAtOTg5MS00RTM4LUE2MTMtQTU5MzBCNzgx' +
+      'ODQzWnl5eXktTU0tZGRWQ3VzdG9t0gAiACMARQAq0wAlACYAJwBGADoAKVxDdXJyZW50IERhdGVUTm9uZdIADwAQABwASdMAEwAeAB8ASgBLAE5fECQ1NTYx' +
+      'MjJGMy1EODc2LTRGNkEtQjI4Qi1CNzZDMjVDOEUwMkPSACIAIwBMACrTACUAJgAnAE0AQQApXkZvcm1hdHRlZCBEYXRlWFdha2VEYXRl0gAPABAAUABRXxAq' +
+      'aXMud29ya2Zsb3cuYWN0aW9ucy5maWx0ZXIuaGVhbHRoLnF1YW50aXR51AATAFIAUwBUAFUAVgB0AG1fEBNXRkNvbnRlbnRJdGVtRmlsdGVyXxAWV0ZDb250' +
+      'ZW50SXRlbVNvcnRPcmRlcl8QGVdGQ29udGVudEl0ZW1Tb3J0UHJvcGVydHlfECQ3QUVBRDcyRC01MjlCLTRGQTItQTk5MC0xNDRBN0RDRDczNjDSACIAIwBX' +
+      'AHPTAFgAWQBaAFsAXABlXxAdV0ZBY3Rpb25QYXJhbWV0ZXJGaWx0ZXJQcmVmaXhfECBXRkFjdGlvblBhcmFtZXRlckZpbHRlclRlbXBsYXRlc18QHVdGQ29u' +
+      'dGVudFByZWRpY2F0ZUJvdW5kZWREYXRlEAGiAF0Aa9UAXgBfAGAAYQBiAGMAZAAnAGUAZldCb3VuZGVkWE9wZXJhdG9yWFByb3BlcnR5WVJlbW92YWJsZVZW' +
+      'YWx1ZXMJEAQI0QBnAGhbRW51bWVyYXRpb27SACIAIwBpAGpVU2xlZXBfEBpXRlN0cmluZ1N1YnN0aXR1dGFibGVTdGF0ZdUAXgBfAGAAYQBiAGMAbABtAGUA' +
+      'bhED6VpTdGFydCBEYXRl0gBvAHAAcQByVk51bWJlclRVbml0UTIQEF8QH1dGQ29udGVudFByZWRpY2F0ZVRhYmxlVGVtcGxhdGVcT2xkZXN0IEZpcnN00gAP' +
+      'ABAAdgB3XxAbaXMud29ya2Zsb3cuYWN0aW9ucy5nZXR0ZXh00gATAHgAeQB6XxAQV0ZUZXh0QWN0aW9uVGV4dF8QJDZDMUQ4NEZCLUI2NjUtNEJCQi1CM0Uy' +
+      'LTQ4NkM1RjBFM0M4Q1DSAA8AEAAcAHzTABMAHgAfAH0AfgCAXxAkRTc0NTAxRjYtN0REQy00MUM1LTgwMUYtODdGOUIwODRERjA10gAiACMAfwAq0wAlACYA' +
+      'JwAwAHkAKVtTYW1wbGVzVGV4dNIADwAQAIIAg18QH2lzLndvcmtmbG93LmFjdGlvbnMucmVwZWF0LmVhY2jTAIQAhQAeAIYAhwCIXxASR3JvdXBpbmdJZGVu' +
+      'dGlmaWVyXxARV0ZDb250cm9sRmxvd01vZGVfECRDOTQ0MDg5NC01M0MxLTQxODktODVBNC1EMEY4RDRFNzIzNDcQANIAIgAjAIkAKtMAJQAmACcAigBVACle' +
+      'SGVhbHRoIFNhbXBsZXPSAA8AEACMAI1fEC5pcy53b3JrZmxvdy5hY3Rpb25zLnByb3BlcnRpZXMuaGVhbHRoLnF1YW50aXR50wATAI4AHgCPACIAkF8QGVdG' +
+      'Q29udGVudEl0ZW1Qcm9wZXJ0eU5hbWVfECRBMDFCNUZFOC02NTcwLTRFMkQtOEJEMS04NzgzRjc4NjdCRTfSACIAIwCRACrSACcAkgCTAJRcVmFyaWFibGVO' +
+      'YW1lWFZhcmlhYmxlW1JlcGVhdCBJdGVt0gAPABAAjACW0wATAI4AHgCXAG0AmF8QJDBDMjI2MUU2LTE0MDMtNDREMS04MEMzLTlEODMzQkRCNTlFRNIAIgAj' +
+      'AJkAKtIAJwCSAJMAlNIADwAQADwAm9UAEwA/AJwAHgBAAJ0AngBjAJ8AoV8QFFdGSVNPODYwMUluY2x1ZGVUaW1lXxAkMTFCMzdENTMtRkVCNi00MzNBLTg1' +
+      'QUUtRUNGMTE4NTNCNDUzWElTTyA4NjAx0gAiACMAoAAq0wAlACYAJwBtAJcAKVZNZWRpdW3SAA8AEACMAKPTABMAjgAeAKQApQCmXxAkQURDNkI1NzAtMzNB' +
+      'NS00NkMyLUJBMDYtRTY3NjYwM0M3NzdFWEVuZCBEYXRl0gAiACMApwAq0gAnAJIAkwCU0gAPABAAPACp1QATAD8AnAAeAEAAqgCeAGMAqwChXxAkNzJENUVC' +
+      'NjQtRjk2NC00N0I5LTgxRTgtMEZGNjAyQTU4QUQw0gAiACMArAAq0wAlACYAJwClAKQAKdIADwAQAHYArtIAEwB4AK8AsF8QJEZBM0M3MkIyLTFGRTktNEUy' +
+      'MC1CNDY1LTI2MzNEQ0ZGQTEyOdIAIgAjALEAvNIAsgCzALQAu18QEmF0dGFjaG1lbnRzQnlSYW5nZVZzdHJpbmfTALUAtgC3ALgAuQC6VnswLCAxfVZ7Miwg' +
+      'MX1WezQsIDF90wAlACYAJwAiAI8AKdMAJQAmACcATQCdACnTACUAJgAnAE0AqgApZv/8AHz//AB8//wACl8QEVdGVGV4dFRva2VuU3RyaW5n0gAPABAAvgC/' +
+      'XxAiaXMud29ya2Zsb3cuYWN0aW9ucy5hcHBlbmR2YXJpYWJsZdMAEwAeAB8AwADBAIBfECRENzU3QTMxRC0xMjYyLTREN0EtOTRDOC1ERDA2ODczNDdENjjS' +
+      'ACIAIwDCACrTACUAJgAnADAArwAp0gAPABAAggDE0wCEABMAhQCGAMUAxl8QJDU4NjBGNUJFLTc1OEYtNDM2Ny05QzI3LTJCOTc0NUI2MEI1MxAC0gAPABAA' +
+      'yADJXxAfaXMud29ya2Zsb3cuYWN0aW9ucy5kb3dubG9hZHVybNYAygATAMsAzADNAM4AZQDPANAA0QDSAPNbU2hvd0hlYWRlcnNeV0ZIVFRQQm9keVR5cGVc' +
+      'V0ZIVFRQTWV0aG9kXFdGSlNPTlZhbHVlc1VXRlVSTF8QJDJGOUFFMEJELTg3MjMtNDhEOC1CQkM3LTI1N0JENEJERDFBNlRKU09OVFBPU1TSACIAIwDTAPLR' +
+      'ANQA1V8QG1dGRGljdGlvbmFyeUZpZWxkVmFsdWVJdGVtc6MA1gDiAOrTANcA2ADZAIcA2gDdWldGSXRlbVR5cGVVV0ZLZXlXV0ZWYWx1ZdIAIgAjANsAvNEA' +
+      'swDcXGFjY2Vzc190b2tlbtIAIgAjAN4AvNIAsgCzAN8A4dEAtQDg0gAnAJIAkwA2Yf/80wDXANgA2QCHAOMA5tIAIgAjAOQAvNEAswDlVGRhdGXSACIAIwDn' +
+      'ALzSALIAswDoAOHRALUA6dIAJwCSAJMATtMA1wDYANkAhwDrAO7SACIAIwDsALzRALMA7VxzYW1wbGVzX3RleHTSACIAIwDvALzSALIAswDwAOHRALUA8dIA' +
+      'JwCSAJMAgF8QFldGRGljdGlvbmFyeUZpZWxkVmFsdWXSACIAIwD0ACrSACcAkgCTACvSAA8AEAD2APdfEB5pcy53b3JrZmxvdy5hY3Rpb25zLnNob3dyZXN1' +
+      'bHTSADAAEwD4APvSACIAIwD5ACrTACUAJgAnAPoAzwApXxAPQ29udGVudHMgb2YgVVJMXxAkREJBNUM1MjMtMzU2QS00RjBFLTlERTctN0U5OERGRDRENUVD' +
+      'WDI2QTAwMDBhWDI3MDAuMC400gD/AQABAQECXxAZV0ZXb3JrZmxvd0ljb25HbHlwaE51bWJlcl8QGFdGV29ya2Zsb3dJY29uU3RhcnRDb2xvchHpthIZvQP/' +
+      'oQEE1QEFAQYBBwEIADAAhwEJABgAFAEKW0FjdGlvbkluZGV4WENhdGVnb3J5XERlZmF1bHRWYWx1ZVxQYXJhbWV0ZXJLZXlZUGFyYW1ldGVybxAaWGtRmU9g' +
+      'doQAIABzAGgAbwByAHQAYwB1AHQALQBhAHAAaQAuAHAAaABwACBbjGV0VzBXQK8QEAEMAQ0BDgEPARABEQESARMBFAEVARYBFwEYARkBGgEbXxAYV0ZBcHBT' +
+      'dG9yZUFwcENvbnRlbnRJdGVtXxAUV0ZBcnRpY2xlQ29udGVudEl0ZW1fEBRXRkNvbnRhY3RDb250ZW50SXRlbV8QEVdGRGF0ZUNvbnRlbnRJdGVtXxAZV0ZF' +
+      'bWFpbEFkZHJlc3NDb250ZW50SXRlbV8QGFdGR2VuZXJpY0ZpbGVDb250ZW50SXRlbV8QEldGSW1hZ2VDb250ZW50SXRlbV8QGldGaVR1bmVzUHJvZHVjdENv' +
+      'bnRlbnRJdGVtXxAVV0ZMb2NhdGlvbkNvbnRlbnRJdGVtXxAPV0ZEQ0NvbnRlbnRJdGVtXxAQV0ZQREZDb250ZW50SXRlbV8QGFdGUGhvbmVOdW1iZXJDb250' +
+      'ZW50SXRlbV8QFVdGUmljaFRleHRDb250ZW50SXRlbV8QGldGU2FmYXJpV2ViUGFnZUNvbnRlbnRJdGVtXxATV0ZTdHJpbmdDb250ZW50SXRlbV8QEFdGVVJM' +
+      'Q29udGVudEl0ZW0RA4RTOTAwaHdhdyBlcGNugepSqE4KTyCgogEhASJYV2F0Y2hLaXRYTkNXaWRnZXQACAA5AE0AZwCBAJ8ArgDKAO4BDwE2AUUBagF8AakB' +
+      'sgHPAewCBgIXAhwCNAJIAlQCewK7AvgC/AMFAycDNAM8A0sDcgN7A4EDlwOkA68DugO/A84D2wPzA/oEAwQQBDcEUgRXBGAEbQSUBJ0EqgSwBLkE2wTgBQcF' +
+      'EAUyBUcFVAVoBXwFowWuBbUFvgXLBdgF3QXmBfMGGgYjBjAGPwZIBlEGfgaPBqUGvgbaBwEHCgcXBzcHWgd6B3wHgQeWB54HpwewB7oHwQfCB8QHxQfKB9YH' +
+      '3wflCAIIFwgaCCUILgg1CDoIPAg+CGAIbQh2CJQInQiwCNcI2AjhCO4JFQkeCSsJNwlACWIJbwmECZgJvwnBCcoJ1wnmCe8KIAotCkkKcAp5CoIKjwqYCqQK' +
+      'rQq6CuEK6grzCvwLEQsoC08LWAthC24LdQt+C4sLsgu7C8QLzQvWC+sMEgwbDCgMMQw6DGEMagxzDIgMjwycDKMMqgyxDL4MywzYDOUM+Q0CDScNNA1bDWQN' +
+      'cQ16DYcNrg2wDbkN2w30DgAODw4cDikOLw5WDlsOYA5pDm4OjA6TDqAOqw6xDrkOwg7HDtQO3Q7mDusO9A73DwQPDQ8SDxcPIA8pDy4PNw9ED00PUg9fD2gP' +
+      'cQ92D38PmA+hD6oPsw/UD90P5g/zEAUQLBA1ED4QRxBjEH4QgRCGEIkQnhCqELMQwBDNENcRDhExEUwRYxF6EY4RqhHFEdoR9xIPEiESNBJPEmcShBKaEq0S' +
+      'sBK0EsUSxhLLEtQAAAAAAAACAgAAAAAAAAEjAAAAAAAAAAAAAAAAAAAS3Q==';
 
-      openBtn.setAttribute('href', importUrl);
-      downloadBtn.setAttribute('href', fileUrl);
+      var statusEl = document.getElementById('status');
+      var downloadBtn = document.getElementById('download-btn');
+      var tryImport = document.getElementById('try-import');
+
+      // 国内更稳的 CDN；仍可能因未签名失败
+      var remoteUrl = 'https://cdn.jsdelivr.net/gh/BXCQ/SleepData@cursor/shortcuts-sleep-api-b98f/shortcuts/SleepData-AutoUpload.shortcut';
+      tryImport.href = 'shortcuts://import-shortcut?url=' + encodeURIComponent(remoteUrl);
 
       function show(msg, warn) {
         statusEl.style.display = 'block';
@@ -137,13 +158,37 @@
         statusEl.className = 'status' + (warn ? ' warn' : '');
       }
 
-      openBtn.addEventListener('click', function () {
-        show('正在打开「快捷指令」…');
-        setTimeout(function () { window.location.href = importUrl; }, 40);
+      function b64ToBlob(b64) {
+        var bin = atob(b64);
+        var len = bin.length;
+        var bytes = new Uint8Array(len);
+        for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+        return new Blob([bytes], { type: 'application/octet-stream' });
+      }
+
+      downloadBtn.addEventListener('click', function () {
+        try {
+          var blob = b64ToBlob(B64);
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'SleepData-AutoUpload.shortcut';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+          show('已开始下载。请到「文件」App 打开该 .shortcut，再用快捷指令导入。');
+        } catch (e) {
+          show('下载失败：' + e.message, true);
+        }
+      });
+
+      tryImport.addEventListener('click', function () {
+        show('若再次提示 URL 无效，请忽略，改用上面的「下载到文件」方式。', true);
       });
 
       if (!/iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
-        show('请用 iPhone/iPad Safari 打开本页后再点导入。', true);
+        show('请用 iPhone Safari 打开本页。电脑可先把此 HTML 传到手机。', true);
       }
     })();
   </script>
