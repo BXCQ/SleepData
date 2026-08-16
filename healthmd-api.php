@@ -5,7 +5,8 @@
  * 对应 Health.md App：Export → Export Target → API Endpoint
  * - URL: https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php
  * - Token: 插件访问令牌（Bearer，由 App 写入 Authorization 头）
- * - 按天 upsert：入库 date 为醒来当天（Health.md noon-to-noon 日记日会换算）
+ * - 全日健康摘要按日历日写入 data/health/
+ * - 睡眠按醒来当天 upsert（Health.md noon-to-noon 日记日会换算）
  */
 
 if (function_exists('apache_setenv')) {
@@ -213,20 +214,20 @@ try {
     // Health.md 用 Authorization: Bearer；body 一般不含 token
     $tokenInfo = sleepData_requireValidToken($data);
 
-    // 先落盘原始 JSON（插件 data/raw/），再解析睡眠摘要
+    // 先落盘原始 JSON（插件 data/raw/），再解析全日健康摘要 + 睡眠
     $rawSaved = sleepData_saveRawHealthmd($data, is_string($raw) ? $raw : null);
 
     $records = [];
     if (isset($data['records']) && is_array($data['records'])) {
         $records = $data['records'];
-    } elseif (isset($data['schema']) && ($data['schema'] === 'healthmd.health_data' || isset($data['sleep']))) {
+    } elseif (isset($data['schema']) && ($data['schema'] === 'healthmd.health_data' || isset($data['sleep']) || isset($data['activity']) || isset($data['heart']))) {
         // 兼容单日文档直接 POST
         $records = [$data];
     } else {
         http_response_code(400);
         echo json_encode([
             'status' => 'error',
-            'message' => '未找到 records[]。请确认 Health.md API Export 已勾选睡眠指标。',
+            'message' => '未找到 records[]。请确认 Health.md API Export 已启用，并勾选需要的健康指标。',
             'hint' => '期望 schema=healthmd.api_export，且 records 为每日 health_data 文档',
         ], JSON_UNESCAPED_UNICODE);
         exit;
@@ -237,28 +238,48 @@ try {
         echo json_encode([
             'status' => 'success',
             'message' => '空 records，已忽略（原始包仍已保存）',
-            'saved' => [],
-            'skipped' => 0,
+            'saved_health' => [],
+            'saved_sleep' => [],
+            'skipped_sleep' => 0,
             'raw' => $rawSaved,
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $saved = [];
-    $skipped = [];
+    $savedHealth = [];
+    $savedSleep = [];
+    $skippedSleep = [];
 
     foreach ($records as $index => $record) {
         if (!is_array($record)) {
-            $skipped[] = ['index' => $index, 'reason' => 'record 不是对象'];
+            $skippedSleep[] = ['index' => $index, 'reason' => 'record 不是对象'];
             continue;
+        }
+
+        $calendarDate = $record['date'] ?? null;
+        if ($calendarDate) {
+            try {
+                $healthInfo = sleepData_saveHealthDay($record);
+                $savedHealth[] = [
+                    'date' => $calendarDate,
+                    'highlights' => $healthInfo['highlights'],
+                    'health_file' => $healthInfo['daily_file'],
+                ];
+            } catch (Exception $e) {
+                $skippedSleep[] = [
+                    'index' => $index,
+                    'date' => $calendarDate,
+                    'reason' => '健康摘要保存失败: ' . $e->getMessage(),
+                ];
+            }
         }
 
         $mapped = healthmd_mapDailyRecord($record);
         if ($mapped === null) {
-            $skipped[] = [
+            $skippedSleep[] = [
                 'index' => $index,
-                'date' => $record['date'] ?? null,
-                'reason' => '无可用 sleep 汇总（请在 Health.md 勾选 Sleep 指标）',
+                'date' => $calendarDate,
+                'reason' => '无可用 sleep 汇总（全日健康摘要仍可能已保存）',
             ];
             continue;
         }
@@ -267,10 +288,11 @@ try {
             && $mapped['deep_sleep_minutes'] <= 0
             && $mapped['light_sleep_minutes'] <= 0
             && $mapped['rem_sleep_minutes'] <= 0) {
-            $skipped[] = [
+            $skippedSleep[] = [
                 'index' => $index,
                 'date' => $mapped['date'],
-                'reason' => '当天无睡眠时长',
+                'source_date' => $mapped['source_date'] ?? $calendarDate,
+                'reason' => '当天无睡眠时长（全日健康摘要仍可能已保存）',
             ];
             continue;
         }
@@ -299,7 +321,7 @@ try {
         ];
 
         $result = sleepData_saveRecord($saveData);
-        $saved[] = [
+        $savedSleep[] = [
             'date' => $saveData['date'],
             'source_date' => $mapped['source_date'] ?? null,
             'sleep_time' => $saveData['sleep_time'],
@@ -312,29 +334,36 @@ try {
         ];
     }
 
-    $ok = count($saved) > 0 || count($skipped) === count($records);
+    $ok = count($savedHealth) > 0 || count($savedSleep) > 0 || count($skippedSleep) === count($records);
     http_response_code(200);
     echo json_encode([
         'status' => $ok ? 'success' : 'error',
         'message' => sprintf(
-            'Health.md 导入完成：保存 %d 天，跳过 %d 天',
-            count($saved),
-            count($skipped)
+            'Health.md 导入完成：健康摘要 %d 天，睡眠 %d 天，睡眠跳过 %d 天',
+            count($savedHealth),
+            count($savedSleep),
+            count($skippedSleep)
         ),
         'schema' => $data['schema'] ?? null,
         'schema_version' => $data['schema_version'] ?? null,
         'exported_at' => $data['exported_at'] ?? null,
-        'saved' => $saved,
-        'skipped' => $skipped,
+        'saved_health' => $savedHealth,
+        'saved_sleep' => $savedSleep,
+        'skipped_sleep' => $skippedSleep,
+        // 兼容旧字段名
+        'saved' => $savedSleep,
+        'skipped' => $skippedSleep,
         'raw' => $rawSaved,
         'paths' => [
             'sleep_summary' => sleepData_resolveDataFile(),
+            'health_index' => sleepData_healthIndexFile(),
+            'health_daily_dir' => sleepData_ensureDataDirs() . '/health/daily',
             'raw_export' => $rawSaved['export_file'] ?? null,
             'raw_daily' => $rawSaved['daily_files'] ?? [],
         ],
         'meta' => [
             'token_source' => $tokenInfo['from_system'] ? 'typecho_config' : (empty($tokenInfo['token']) ? 'none' : 'config_file'),
-            'note' => '入库 date 为醒来当天（已把 Health.md noon-to-noon 日记日换算）。同一 date 重复导出 upsert。原始 JSON 仍按 Health.md 原 date 落在 data/raw/daily/。',
+            'note' => '全日健康按日历日写入 data/health/；睡眠 date 为醒来当天。原始 JSON 在 data/raw/。可在 Health.md 勾选 Activity/Heart/Vitals 等全部指标。',
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 } catch (Exception $e) {
