@@ -5,7 +5,7 @@
  * 对应 Health.md App：Export → Export Target → API Endpoint
  * - URL: https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php
  * - Token: 插件访问令牌（Bearer，由 App 写入 Authorization 头）
- * - 按天 upsert：同一 date 重复导出会覆盖更新
+ * - 按天 upsert：入库 date 为醒来当天（Health.md noon-to-noon 日记日会换算）
  */
 
 if (function_exists('apache_setenv')) {
@@ -68,11 +68,12 @@ function healthmd_to_hhmm($value)
 
 /**
  * 将单日 Health.md health_data 记录映射为插件存储结构
+ * date 统一为「醒来当天」日历日（修正 noon-to-noon）
  */
 function healthmd_mapDailyRecord(array $record)
 {
-    $date = $record['date'] ?? null;
-    if (!$date) {
+    $sourceDate = $record['date'] ?? null;
+    if (!$sourceDate) {
         return null;
     }
 
@@ -81,9 +82,10 @@ function healthmd_mapDailyRecord(array $record)
         $sleep = $record['sleep'];
     }
 
-    // 若无汇总字段但有 sleepStages，走样本汇总
+    // 若无汇总字段但有 sleepStages，走样本汇总（结果 date 已是起床日）
     $hasSummary = isset($sleep['deepSleep']) || isset($sleep['coreSleep']) || isset($sleep['remSleep'])
-        || isset($sleep['totalDuration']) || isset($sleep['total_sleep']);
+        || isset($sleep['totalDuration']) || isset($sleep['total_sleep'])
+        || isset($sleep['inBedTime']) || isset($sleep['inBed']);
 
     if (!$hasSummary && !empty($sleep['sleepStages']) && is_array($sleep['sleepStages'])) {
         $samples = [];
@@ -97,10 +99,12 @@ function healthmd_mapDailyRecord(array $record)
                 'end' => $stage['endDate'] ?? $stage['end'] ?? null,
             ];
         }
-        $aggregated = sleepData_aggregateSamples($samples, $date);
+        // 不传 Health.md 日记日，避免正午窗口裁切；由样本结束时间推起床日
+        $aggregated = sleepData_aggregateSamples($samples, null);
         if ($aggregated) {
             return [
                 'date' => $aggregated['date'],
+                'source_date' => $sourceDate,
                 'sleep_time' => $aggregated['sleep_time'],
                 'wake_up_time' => $aggregated['wake_up_time'],
                 'deep_sleep_minutes' => (int) $aggregated['deep_sleep_minutes'],
@@ -122,20 +126,39 @@ function healthmd_mapDailyRecord(array $record)
     $light = healthmd_to_minutes($sleep['coreSleep'] ?? $sleep['lightSleep'] ?? $sleep['light_sleep'] ?? $sleep['core'] ?? 0);
     $rem = healthmd_to_minutes($sleep['remSleep'] ?? $sleep['rem_sleep'] ?? $sleep['rem'] ?? 0);
     $awake = healthmd_to_minutes($sleep['awakeTime'] ?? $sleep['awake'] ?? $sleep['awake_minutes'] ?? 0);
+    $inBed = healthmd_to_minutes($sleep['inBedTime'] ?? $sleep['inBed'] ?? $sleep['in_bed'] ?? $sleep['inBedSeconds'] ?? 0);
     $total = healthmd_to_minutes($sleep['totalDuration'] ?? $sleep['total_sleep'] ?? $sleep['asleep'] ?? null);
     if ($total <= 0) {
         $total = $deep + $light + $rem;
     }
+    if ($total <= 0 && $inBed > 0) {
+        $total = max(0, $inBed - $awake);
+        if ($light === 0) {
+            $light = $total;
+        }
+    }
 
-    $sleepTime = healthmd_to_hhmm($sleep['bedtime'] ?? $sleep['sleep_time'] ?? $sleep['bedtimeISO'] ?? null);
-    $wakeTime = healthmd_to_hhmm($sleep['wakeTime'] ?? $sleep['wake_up_time'] ?? $sleep['wakeTimeISO'] ?? null);
+    $bedtimeISO = $sleep['bedtimeISO'] ?? $sleep['bedtime_iso'] ?? null;
+    $wakeTimeISO = $sleep['wakeTimeISO'] ?? $sleep['wake_time_iso'] ?? null;
+
+    $sleepTime = healthmd_to_hhmm(
+        $sleep['bedtime'] ?? $sleep['sleep_time'] ?? $sleep['inBedStart'] ?? $bedtimeISO ?? null
+    );
+    $wakeTime = healthmd_to_hhmm(
+        $sleep['wakeTime'] ?? $sleep['wake_up_time'] ?? $sleep['inBedEnd'] ?? $wakeTimeISO ?? null
+    );
 
     // 从 ISO 补全本地时区时间
-    if (!$sleepTime && !empty($sleep['bedtimeISO'])) {
-        $sleepTime = healthmd_to_hhmm($sleep['bedtimeISO']);
+    if (!$sleepTime && $bedtimeISO) {
+        $sleepTime = healthmd_to_hhmm($bedtimeISO);
     }
-    if (!$wakeTime && !empty($sleep['wakeTimeISO'])) {
-        $wakeTime = healthmd_to_hhmm($sleep['wakeTimeISO']);
+    if (!$wakeTime && $wakeTimeISO) {
+        $wakeTime = healthmd_to_hhmm($wakeTimeISO);
+    }
+
+    $date = sleepData_resolveWakeDate($sourceDate, $bedtimeISO, $wakeTimeISO, $sleepTime, $wakeTime);
+    if (!$date) {
+        $date = $sourceDate;
     }
 
     $score = null;
@@ -152,6 +175,7 @@ function healthmd_mapDailyRecord(array $record)
 
     return [
         'date' => $date,
+        'source_date' => $sourceDate,
         'sleep_time' => $sleepTime,
         'wake_up_time' => $wakeTime,
         'deep_sleep_minutes' => $deep,
@@ -277,6 +301,9 @@ try {
         $result = sleepData_saveRecord($saveData);
         $saved[] = [
             'date' => $saveData['date'],
+            'source_date' => $mapped['source_date'] ?? null,
+            'sleep_time' => $saveData['sleep_time'],
+            'wake_up_time' => $saveData['wake_up_time'],
             'sleep_score' => $saveData['sleep_score'],
             'total_sleep_minutes' => $saveData['total_sleep_minutes'],
             'score_estimated' => $scoreEstimated,
@@ -307,7 +334,7 @@ try {
         ],
         'meta' => [
             'token_source' => $tokenInfo['from_system'] ? 'typecho_config' : (empty($tokenInfo['token']) ? 'none' : 'config_file'),
-            'note' => '同一 date 重复导出将 upsert 覆盖。原始 JSON 与睡眠摘要均保存在插件 data/ 目录。',
+            'note' => '入库 date 为醒来当天（已把 Health.md noon-to-noon 日记日换算）。同一 date 重复导出 upsert。原始 JSON 仍按 Health.md 原 date 落在 data/raw/daily/。',
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 } catch (Exception $e) {

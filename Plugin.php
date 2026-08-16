@@ -6,7 +6,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 
  * @package SleepData
  * @author 璇
- * @version 1.8.0
+ * @version 1.8.1
  * @link https://blog.ybyq.wang
  */
 class SleepData_Plugin implements Typecho_Plugin_Interface
@@ -109,7 +109,8 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
     }
 
     /**
-     * 获取今天的睡眠数据
+     * 获取今天的睡眠数据（按醒来当天的日历日）
+     * 兼容旧数据：Health.md noon-to-noon 曾把今早醒来的一夜记在昨天。
      * @return array|null
      */
     public static function getTodaySleepData()
@@ -118,8 +119,32 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
             $db = Typecho_Db::get();
             $prefix = $db->getPrefix();
             $tableName = $prefix . 'sleep_data';
-            $today = date('Y-m-d');
-            return $db->fetchRow($db->select()->from($tableName)->where('date = ?', $today));
+
+            $tzName = 'Asia/Shanghai';
+            try {
+                $tz = new DateTimeZone($tzName);
+            } catch (Exception $e) {
+                $tz = new DateTimeZone(date_default_timezone_get() ?: 'UTC');
+            }
+            $now = new DateTimeImmutable('now', $tz);
+            $today = $now->format('Y-m-d');
+            $yesterday = $now->modify('-1 day')->format('Y-m-d');
+
+            $todayRow = $db->fetchRow($db->select()->from($tableName)->where('date = ?', $today));
+            if (!empty($todayRow)) {
+                return $todayRow;
+            }
+
+            // 旧记录可能仍用 Health.md 日记日（昨夜）
+            $yesterdayRow = $db->fetchRow($db->select()->from($tableName)->where('date = ?', $yesterday));
+            if (!empty($yesterdayRow)) {
+                $wake = isset($yesterdayRow['wake_up_time']) ? substr((string) $yesterdayRow['wake_up_time'], 0, 5) : '';
+                if ($wake !== '' && $wake < '12:00') {
+                    return $yesterdayRow;
+                }
+            }
+
+            return null;
         } catch (Exception $e) {
             return null;
         }

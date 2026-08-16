@@ -473,6 +473,64 @@ if (!function_exists('sleepData_parseDateTime')) {
     }
 }
 
+if (!function_exists('sleepData_resolveWakeDate')) {
+    /**
+     * 将 Health.md noon-to-noon 日记日期规范为「醒来当天」日历日。
+     *
+     * Health.md 睡眠摘要按正午到次日正午归属一夜，夜眠常落在「昨晚」的 date 上；
+     * 博客主题「今日睡眠」按日历日（起床日）查询，二者不一致时侧边栏会空。
+     *
+     * 优先级：wakeTimeISO → bedtimeISO+起床钟点 → 日记日+午前起床则 +1 天 → 原 date
+     *
+     * @param string|null $sourceDate Health.md records[].date
+     * @param string|null $bedtimeISO
+     * @param string|null $wakeTimeISO
+     * @param string|null $sleepTime HH:mm
+     * @param string|null $wakeTime HH:mm
+     * @return string|null Y-m-d
+     */
+    function sleepData_resolveWakeDate(
+        $sourceDate,
+        $bedtimeISO = null,
+        $wakeTimeISO = null,
+        $sleepTime = null,
+        $wakeTime = null
+    ) {
+        $tz = sleepData_preferredTimezone();
+
+        $wakeDt = sleepData_parseDateTime($wakeTimeISO);
+        if ($wakeDt) {
+            return $wakeDt->setTimezone($tz)->format('Y-m-d');
+        }
+
+        $bedDt = sleepData_parseDateTime($bedtimeISO);
+        if ($bedDt && is_string($wakeTime) && preg_match('/^(\d{1,2}):(\d{2})/', trim($wakeTime), $m)) {
+            $localBed = $bedDt->setTimezone($tz);
+            $candidate = $localBed->setTime((int) $m[1], (int) $m[2], 0);
+            if ($candidate <= $localBed) {
+                $candidate = $candidate->modify('+1 day');
+            }
+            return $candidate->format('Y-m-d');
+        }
+
+        $sourceDate = is_string($sourceDate) ? trim($sourceDate) : '';
+        if ($sourceDate !== '' && is_string($wakeTime) && preg_match('/^(\d{1,2}):(\d{2})/', trim($wakeTime), $m)) {
+            try {
+                $base = new DateTimeImmutable($sourceDate, $tz);
+                // noon-to-noon：起床在 00:00–11:59 属于次日日历
+                if ((int) $m[1] < 12) {
+                    return $base->modify('+1 day')->format('Y-m-d');
+                }
+                return $base->format('Y-m-d');
+            } catch (Exception $e) {
+                return $sourceDate;
+            }
+        }
+
+        return $sourceDate !== '' ? $sourceDate : null;
+    }
+}
+
 if (!function_exists('sleepData_aggregateSamples')) {
     /**
      * 从原始睡眠样本汇总一夜数据
