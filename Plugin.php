@@ -322,6 +322,112 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
     }
 
     /**
+     * 获取图表和统计所需的步数数据（主题顶栏等）
+     * @param int $days
+     * @return array|null
+     */
+    public static function getStepDataForChart($days = 30)
+    {
+        try {
+            $helper = dirname(__FILE__) . '/lib/HealthDataHelper.php';
+            if (file_exists($helper)) {
+                require_once $helper;
+            }
+
+            // 索引最多约 400 天；累计用全量，图表取最近 $days 天
+            $index = healthData_loadHealthIndex(400);
+            $days = max(1, (int) $days);
+            $history = array_slice($index, 0, $days);
+            $stats = [
+                'today_steps' => 0,
+                'week_avg' => 0,
+                'month_avg' => 0,
+                'total_steps' => 0,
+                'best_record' => null,
+                'worst_record' => null,
+            ];
+
+            if (empty($index)) {
+                return ['stats' => $stats, 'chart_data' => []];
+            }
+
+            $week_steps = 0;
+            $week_count = 0;
+            $month_steps = 0;
+            $month_count = 0;
+            $total_steps = 0;
+            $best_step_count = 0;
+            $best_date = '';
+            $worst_step_count = -1;
+            $worst_date = '';
+            $seven_days_ago = strtotime('-7 days');
+            $thirty_days_ago = strtotime('-29 days');
+            $today_date = date('Y-m-d');
+
+            foreach ($index as $item) {
+                if (!isset($item['steps']) || $item['steps'] === null) {
+                    continue;
+                }
+                $current_steps = (int) $item['steps'];
+                $item_date = $item['date'] ?? '';
+                $item_timestamp = $item_date !== '' ? strtotime($item_date) : false;
+                if ($item_timestamp === false) {
+                    continue;
+                }
+
+                $total_steps += $current_steps;
+
+                if ($item_date === $today_date) {
+                    $stats['today_steps'] = $current_steps;
+                }
+
+                if ($item_timestamp >= $thirty_days_ago) {
+                    $month_steps += $current_steps;
+                    $month_count++;
+                }
+                if ($item_timestamp > $seven_days_ago) {
+                    $week_steps += $current_steps;
+                    $week_count++;
+                }
+
+                if ($current_steps >= $best_step_count) {
+                    $best_step_count = $current_steps;
+                    $best_date = $item_date;
+                }
+                if ($worst_step_count === -1 || $current_steps < $worst_step_count) {
+                    $worst_step_count = $current_steps;
+                    $worst_date = $item_date;
+                }
+            }
+
+            $stats['week_avg'] = $week_count > 0 ? (int) round($week_steps / $week_count) : 0;
+            $stats['month_avg'] = $month_count > 0 ? (int) round($month_steps / $month_count) : 0;
+            $stats['total_steps'] = $total_steps;
+            if ($best_step_count > 0) {
+                $stats['best_record'] = ['date' => $best_date, 'step_count' => $best_step_count];
+            }
+            if ($worst_step_count !== -1) {
+                $stats['worst_record'] = ['date' => $worst_date, 'step_count' => $worst_step_count];
+            }
+
+            $chartData = [];
+            foreach (array_reverse($history) as $item) {
+                if (!isset($item['date'])) {
+                    continue;
+                }
+                $chartData[] = [
+                    'date' => $item['date'],
+                    'steps' => isset($item['steps']) ? (int) $item['steps'] : 0,
+                ];
+            }
+
+            return ['stats' => $stats, 'chart_data' => $chartData];
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * 获取图表和统计所需的睡眠数据
      * @param int $days
      * @return array|null
