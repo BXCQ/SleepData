@@ -3,7 +3,7 @@
  * Health.md API Export 接收接口
  *
  * 对应 Health.md App：Export → Export Target → API Endpoint
- * - URL: https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php
+ * - URL: https://blog.ybyq.wang/usr/plugins/HealthData/healthmd-api.php
  * - Token: 插件访问令牌（Bearer，由 App 写入 Authorization 头）
  * - 全日健康摘要按日历日写入 data/health/
  * - 睡眠按醒来当天 upsert（Health.md noon-to-noon 日记日会换算）
@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-require_once __DIR__ . '/lib/SleepDataHelper.php';
+require_once __DIR__ . '/lib/HealthDataHelper.php';
 
 /**
  * Health.md 睡眠时长字段为秒，转为分钟
@@ -42,7 +42,7 @@ function healthmd_to_minutes($value)
         return 0;
     }
     if (is_string($value) && !is_numeric($value)) {
-        return sleepData_parseDurationToMinutes($value);
+        return healthData_parseDurationToMinutes($value);
     }
     return (int) round(((float) $value) / 60);
 }
@@ -60,9 +60,9 @@ function healthmd_to_hhmm($value)
         $parts = explode(':', $m[1]);
         return sprintf('%02d:%02d', (int) $parts[0], (int) $parts[1]);
     }
-    $dt = sleepData_parseDateTime($value);
+    $dt = healthData_parseDateTime($value);
     if ($dt) {
-        return $dt->setTimezone(sleepData_preferredTimezone())->format('H:i');
+        return $dt->setTimezone(healthData_preferredTimezone())->format('H:i');
     }
     return null;
 }
@@ -101,7 +101,7 @@ function healthmd_mapDailyRecord(array $record)
             ];
         }
         // 不传 Health.md 日记日，避免正午窗口裁切；由样本结束时间推起床日
-        $aggregated = sleepData_aggregateSamples($samples, null);
+        $aggregated = healthData_aggregateSamples($samples, null);
         if ($aggregated) {
             return [
                 'date' => $aggregated['date'],
@@ -157,7 +157,7 @@ function healthmd_mapDailyRecord(array $record)
         $wakeTime = healthmd_to_hhmm($wakeTimeISO);
     }
 
-    $date = sleepData_resolveWakeDate($sourceDate, $bedtimeISO, $wakeTimeISO, $sleepTime, $wakeTime);
+    $date = healthData_resolveWakeDate($sourceDate, $bedtimeISO, $wakeTimeISO, $sleepTime, $wakeTime);
     if (!$date) {
         $date = $sourceDate;
     }
@@ -212,10 +212,10 @@ try {
     }
 
     // Health.md 用 Authorization: Bearer；body 一般不含 token
-    $tokenInfo = sleepData_requireValidToken($data);
+    $tokenInfo = healthData_requireValidToken($data);
 
     // 先落盘原始 JSON（插件 data/raw/），再解析全日健康摘要 + 睡眠
-    $rawSaved = sleepData_saveRawHealthmd($data, is_string($raw) ? $raw : null);
+    $rawSaved = healthData_saveRawHealthmd($data, is_string($raw) ? $raw : null);
 
     $records = [];
     if (isset($data['records']) && is_array($data['records'])) {
@@ -259,7 +259,7 @@ try {
         $calendarDate = $record['date'] ?? null;
         if ($calendarDate) {
             try {
-                $healthInfo = sleepData_saveHealthDay($record);
+                $healthInfo = healthData_saveHealthDay($record);
                 $savedHealth[] = [
                     'date' => $calendarDate,
                     'highlights' => $healthInfo['highlights'],
@@ -300,8 +300,8 @@ try {
         $scoreEstimated = false;
         $sleepScore = $mapped['score_hint'];
         if ($sleepScore === null) {
-            $recent = sleepData_getRecentSleepTimes($mapped['date']);
-            $sleepScore = sleepData_estimateScore($mapped, $recent);
+            $recent = healthData_getRecentSleepTimes($mapped['date']);
+            $sleepScore = healthData_estimateScore($mapped, $recent);
             $scoreEstimated = true;
         }
 
@@ -320,7 +320,7 @@ try {
             'score_estimated' => $scoreEstimated,
         ];
 
-        $result = sleepData_saveRecord($saveData);
+        $result = healthData_saveRecord($saveData);
         $savedSleep[] = [
             'date' => $saveData['date'],
             'source_date' => $mapped['source_date'] ?? null,
@@ -355,9 +355,9 @@ try {
         'skipped' => $skippedSleep,
         'raw' => $rawSaved,
         'paths' => [
-            'sleep_summary' => sleepData_resolveDataFile(),
-            'health_index' => sleepData_healthIndexFile(),
-            'health_daily_dir' => sleepData_ensureDataDirs() . '/health/daily',
+            'sleep_summary' => healthData_resolveDataFile(),
+            'health_index' => healthData_healthIndexFile(),
+            'health_daily_dir' => healthData_ensureDataDirs() . '/health/daily',
             'raw_export' => $rawSaved['export_file'] ?? null,
             'raw_daily' => $rawSaved['daily_files'] ?? [],
         ],
@@ -367,7 +367,7 @@ try {
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 } catch (Exception $e) {
-    error_log('SleepData Health.md API Error: ' . $e->getMessage());
+    error_log('HealthData Health.md API Error: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'status' => 'error',

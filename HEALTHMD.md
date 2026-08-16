@@ -6,7 +6,7 @@
 
 ## 服务器存储位置（插件目录内）
 
-默认都在 `usr/plugins/SleepData/data/`：
+默认都在 `usr/plugins/HealthData/data/`：
 
 | 内容 | 路径 | 说明 |
 |------|------|------|
@@ -24,8 +24,8 @@
 
 | 项 | 填写 |
 |----|------|
-| **Endpoint** | `https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php` |
-| **bearer token** | Typecho 插件「睡眠数据」里的 **API访问令牌** |
+| **Endpoint** | `https://blog.ybyq.wang/usr/plugins/HealthData/healthmd-api.php` |
+| **bearer token** | Typecho 插件「健康数据」里的 **API访问令牌** |
 
 说明：
 
@@ -42,20 +42,19 @@
 
 ```bash
 # 最近一天亮点
-curl 'https://blog.ybyq.wang/usr/plugins/SleepData/health-api.php?latest=1&access_token=你的令牌'
+curl 'https://blog.ybyq.wang/usr/plugins/HealthData/health-api.php?latest=1&access_token=你的令牌'
 
 # 指定日完整摘要
-curl 'https://blog.ybyq.wang/usr/plugins/SleepData/health-api.php?date=2026-08-16&full=1&access_token=你的令牌'
+curl 'https://blog.ybyq.wang/usr/plugins/HealthData/health-api.php?date=2026-08-16&full=1&access_token=你的令牌'
 
 # 最近 30 天亮点列表
-curl 'https://blog.ybyq.wang/usr/plugins/SleepData/health-api.php?days=30&access_token=你的令牌'
+curl 'https://blog.ybyq.wang/usr/plugins/HealthData/health-api.php?days=30&access_token=你的令牌'
 ```
 
 主题侧也可调用：
 
-- `SleepData_Plugin::getTodayHealthData()`
-- `SleepData_Plugin::getLatestHealthData()`
-- `SleepData_Plugin::getHealthHighlights(14)`
+- `HealthData_Plugin::getTodayHealthData()` / `getLatestHealthData()` / `getHealthHighlights(14)`
+- `HealthData_Plugin::getTodaySleepData()` / `getLatestSleepData()`（睡眠表）
 
 ## 睡眠映射
 
@@ -110,7 +109,7 @@ Health.md 睡眠摘要按 **正午 → 次日正午** 归属一夜，所以「�
 ## 自测
 
 ```bash
-curl -X POST 'https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php' \
+curl -X POST 'https://blog.ybyq.wang/usr/plugins/HealthData/healthmd-api.php' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer 你的令牌' \
   -d '{
@@ -152,5 +151,5 @@ curl -X POST 'https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php' \
 
 - `healthmd-api.php`
 - `health-api.php`
-- `lib/SleepDataHelper.php`
+- `lib/HealthDataHelper.php`
 - `Plugin.php`（后台会显示 Health.md Endpoint 与健康亮点）

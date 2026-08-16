@@ -3,27 +3,27 @@
  * 睡眠数据公共逻辑：令牌校验、时长解析、文件/数据库存储
  */
 
-if (!function_exists('sleepData_pluginDir')) {
-    /** 插件根目录（SleepData/） */
-    function sleepData_pluginDir()
+if (!function_exists('healthData_pluginDir')) {
+    /** 插件根目录（HealthData/） */
+    function healthData_pluginDir()
     {
         return dirname(__DIR__);
     }
 }
 
-if (!function_exists('sleepData_blogRoot')) {
-    /** Typecho 博客根目录（usr/plugins/SleepData → 上三级） */
-    function sleepData_blogRoot()
+if (!function_exists('healthData_blogRoot')) {
+    /** Typecho 博客根目录（usr/plugins/HealthData → 上三级） */
+    function healthData_blogRoot()
     {
-        return dirname(dirname(dirname(sleepData_pluginDir())));
+        return dirname(dirname(dirname(healthData_pluginDir())));
     }
 }
 
-if (!function_exists('sleepData_parseDurationToMinutes')) {
+if (!function_exists('healthData_parseDurationToMinutes')) {
     /**
      * 将 "X小时Y分钟" 或纯数字（分钟）解析为总分钟数
      */
-    function sleepData_parseDurationToMinutes($durationStr)
+    function healthData_parseDurationToMinutes($durationStr)
     {
         if ($durationStr === null || $durationStr === '') {
             return 0;
@@ -47,23 +47,23 @@ if (!function_exists('sleepData_parseDurationToMinutes')) {
     }
 }
 
-if (!function_exists('sleepData_getConfiguredToken')) {
+if (!function_exists('healthData_getConfiguredToken')) {
     /**
      * 读取已配置的访问令牌
      * @return array{token:string, from_system:bool}
      */
-    function sleepData_getConfiguredToken()
+    function healthData_getConfiguredToken()
     {
         $configuredToken = '';
         $tokenFromSystem = false;
-        $rootDir = sleepData_blogRoot();
+        $rootDir = healthData_blogRoot();
 
         if (file_exists($rootDir . '/config.inc.php')) {
             try {
                 require_once $rootDir . '/config.inc.php';
                 if (class_exists('Typecho_Db')) {
                     $db = Typecho_Db::get();
-                    $options = $db->fetchRow($db->select()->from('table.options')->where('name = ?', 'plugin:SleepData'));
+                    $options = $db->fetchRow($db->select()->from('table.options')->where('name = ?', 'plugin:HealthData'));
                     if ($options && !empty($options['value'])) {
                         $pluginOptions = unserialize($options['value']);
                         if (isset($pluginOptions['accessToken']) && !empty($pluginOptions['accessToken'])) {
@@ -73,12 +73,12 @@ if (!function_exists('sleepData_getConfiguredToken')) {
                     }
                 }
             } catch (Exception $e) {
-                error_log('SleepData: 从 Typecho 配置读取令牌失败: ' . $e->getMessage());
+                error_log('HealthData: 从 Typecho 配置读取令牌失败: ' . $e->getMessage());
             }
         }
 
         if ($configuredToken === '') {
-            $configFile = sleepData_pluginDir() . '/data_config.php';
+            $configFile = healthData_pluginDir() . '/data_config.php';
             if (file_exists($configFile)) {
                 include_once $configFile;
                 if (defined('API_ACCESS_TOKEN') && API_ACCESS_TOKEN !== '') {
@@ -91,11 +91,11 @@ if (!function_exists('sleepData_getConfiguredToken')) {
     }
 }
 
-if (!function_exists('sleepData_extractRequestToken')) {
+if (!function_exists('healthData_extractRequestToken')) {
     /**
      * 从 JSON body 或 Authorization Bearer 头读取请求令牌
      */
-    function sleepData_extractRequestToken(array $data)
+    function healthData_extractRequestToken(array $data)
     {
         if (!empty($data['access_token'])) {
             return (string) $data['access_token'];
@@ -127,18 +127,18 @@ if (!function_exists('sleepData_extractRequestToken')) {
     }
 }
 
-if (!function_exists('sleepData_requireValidToken')) {
+if (!function_exists('healthData_requireValidToken')) {
     /**
      * 校验令牌；失败时直接输出 JSON 并 exit
      * @return array{token:string, from_system:bool}
      */
-    function sleepData_requireValidToken(array &$data)
+    function healthData_requireValidToken(array &$data)
     {
-        $tokenInfo = sleepData_getConfiguredToken();
+        $tokenInfo = healthData_getConfiguredToken();
         $configuredToken = $tokenInfo['token'];
 
         if ($configuredToken !== '') {
-            $requestToken = sleepData_extractRequestToken($data);
+            $requestToken = healthData_extractRequestToken($data);
             if ($requestToken === '' || $requestToken !== $configuredToken) {
                 http_response_code(401);
                 echo json_encode([
@@ -154,14 +154,14 @@ if (!function_exists('sleepData_requireValidToken')) {
     }
 }
 
-if (!function_exists('sleepData_ensureDataDirs')) {
+if (!function_exists('healthData_ensureDataDirs')) {
     /**
      * 确保插件目录下 data / raw / health 可写
      * @return string data 目录绝对路径
      */
-    function sleepData_ensureDataDirs()
+    function healthData_ensureDataDirs()
     {
-        $base = sleepData_pluginDir() . '/data';
+        $base = healthData_pluginDir() . '/data';
         $dirs = [
             $base,
             $base . '/raw',
@@ -179,26 +179,26 @@ if (!function_exists('sleepData_ensureDataDirs')) {
     }
 }
 
-if (!function_exists('sleepData_healthIndexFile')) {
-    function sleepData_healthIndexFile()
+if (!function_exists('healthData_healthIndexFile')) {
+    function healthData_healthIndexFile()
     {
-        return sleepData_ensureDataDirs() . '/health/index.json';
+        return healthData_ensureDataDirs() . '/health/index.json';
     }
 }
 
-if (!function_exists('sleepData_healthDailyFile')) {
-    function sleepData_healthDailyFile($date)
+if (!function_exists('healthData_healthDailyFile')) {
+    function healthData_healthDailyFile($date)
     {
         $date = preg_replace('/[^0-9\\-]/', '', (string) $date);
-        return sleepData_ensureDataDirs() . '/health/daily/' . $date . '.json';
+        return healthData_ensureDataDirs() . '/health/daily/' . $date . '.json';
     }
 }
 
-if (!function_exists('sleepData_stripHealthmdBulkyFields')) {
+if (!function_exists('healthData_stripHealthmdBulkyFields')) {
     /**
      * 去掉样本数组 / lossless 归档等大字段，保留日汇总便于主题与查询
      */
-    function sleepData_stripHealthmdBulkyFields(array $record)
+    function healthData_stripHealthmdBulkyFields(array $record)
     {
         $out = $record;
         unset($out['healthkit_record_archive'], $out['diagnostics']);
@@ -251,11 +251,11 @@ if (!function_exists('sleepData_stripHealthmdBulkyFields')) {
     }
 }
 
-if (!function_exists('sleepData_healthHighlights')) {
+if (!function_exists('healthData_healthHighlights')) {
     /**
      * 从单日 health_data 提取主题/列表常用亮点（日历日，不做睡眠日换算）
      */
-    function sleepData_healthHighlights(array $record)
+    function healthData_healthHighlights(array $record)
     {
         $activity = (isset($record['activity']) && is_array($record['activity'])) ? $record['activity'] : [];
         $heart = (isset($record['heart']) && is_array($record['heart'])) ? $record['heart'] : [];
@@ -302,23 +302,23 @@ if (!function_exists('sleepData_healthHighlights')) {
     }
 }
 
-if (!function_exists('sleepData_saveHealthDay')) {
+if (!function_exists('healthData_saveHealthDay')) {
     /**
      * 保存单日健康摘要（去大字段）并更新 index.json
      * @return array{daily_file:string, highlights:array}
      */
-    function sleepData_saveHealthDay(array $record)
+    function healthData_saveHealthDay(array $record)
     {
         $date = isset($record['date']) ? preg_replace('/[^0-9\\-]/', '', (string) $record['date']) : '';
         if ($date === '') {
             throw new Exception('健康日摘要缺少 date');
         }
 
-        sleepData_ensureDataDirs();
+        healthData_ensureDataDirs();
         $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
 
-        $summary = sleepData_stripHealthmdBulkyFields($record);
-        $highlights = sleepData_healthHighlights($summary);
+        $summary = healthData_stripHealthmdBulkyFields($record);
+        $highlights = healthData_healthHighlights($summary);
         $highlights['date'] = $date;
         $highlights['updated_at'] = date('c');
 
@@ -333,12 +333,12 @@ if (!function_exists('sleepData_saveHealthDay')) {
             'health' => $summary,
         ];
 
-        $dailyFile = sleepData_healthDailyFile($date);
+        $dailyFile = healthData_healthDailyFile($date);
         if (@file_put_contents($dailyFile, json_encode($payload, $flags)) === false) {
             throw new Exception('无法写入健康日摘要: ' . $dailyFile);
         }
 
-        $indexFile = sleepData_healthIndexFile();
+        $indexFile = healthData_healthIndexFile();
         $index = [];
         if (file_exists($indexFile)) {
             $decoded = json_decode((string) file_get_contents($indexFile), true);
@@ -379,10 +379,10 @@ if (!function_exists('sleepData_saveHealthDay')) {
     }
 }
 
-if (!function_exists('sleepData_loadHealthDay')) {
-    function sleepData_loadHealthDay($date)
+if (!function_exists('healthData_loadHealthDay')) {
+    function healthData_loadHealthDay($date)
     {
-        $file = sleepData_healthDailyFile($date);
+        $file = healthData_healthDailyFile($date);
         if (!file_exists($file)) {
             return null;
         }
@@ -391,10 +391,10 @@ if (!function_exists('sleepData_loadHealthDay')) {
     }
 }
 
-if (!function_exists('sleepData_loadHealthIndex')) {
-    function sleepData_loadHealthIndex($limit = 30)
+if (!function_exists('healthData_loadHealthIndex')) {
+    function healthData_loadHealthIndex($limit = 30)
     {
-        $file = sleepData_healthIndexFile();
+        $file = healthData_healthIndexFile();
         if (!file_exists($file)) {
             return [];
         }
@@ -407,26 +407,26 @@ if (!function_exists('sleepData_loadHealthIndex')) {
     }
 }
 
-if (!function_exists('sleepData_getLatestHealthDay')) {
-    function sleepData_getLatestHealthDay()
+if (!function_exists('healthData_getLatestHealthDay')) {
+    function healthData_getLatestHealthDay()
     {
-        $index = sleepData_loadHealthIndex(1);
+        $index = healthData_loadHealthIndex(1);
         if (empty($index[0]['date'])) {
             return null;
         }
-        return sleepData_loadHealthDay($index[0]['date']);
+        return healthData_loadHealthDay($index[0]['date']);
     }
 }
 
-if (!function_exists('sleepData_resolveDataFile')) {
+if (!function_exists('healthData_resolveDataFile')) {
     /**
      * 解析睡眠摘要 JSON 路径（默认：插件目录/data/sleep_data.json）
      */
-    function sleepData_resolveDataFile()
+    function healthData_resolveDataFile()
     {
-        $dataDir = sleepData_ensureDataDirs();
+        $dataDir = healthData_ensureDataDirs();
         $preferred = $dataDir . '/sleep_data.json';
-        $configFile = sleepData_pluginDir() . '/data_config.php';
+        $configFile = healthData_pluginDir() . '/data_config.php';
         $dataFile = '';
 
         if (file_exists($configFile)) {
@@ -468,7 +468,7 @@ if (!function_exists('sleepData_resolveDataFile')) {
     }
 }
 
-if (!function_exists('sleepData_saveRawHealthmd')) {
+if (!function_exists('healthData_saveRawHealthmd')) {
     /**
      * 保存 Health.md 原始 JSON 到插件 data/raw 下
      * - 完整请求包：data/raw/exports/healthmd-时间戳.json
@@ -478,10 +478,10 @@ if (!function_exists('sleepData_saveRawHealthmd')) {
      * @param string|null $rawBody 原始请求体（优先原样落盘）
      * @return array{export_file:?string, daily_files:array<string>}
      */
-    function sleepData_saveRawHealthmd(array $data, $rawBody = null)
+    function healthData_saveRawHealthmd(array $data, $rawBody = null)
     {
-        sleepData_ensureDataDirs();
-        $pluginDir = sleepData_pluginDir();
+        healthData_ensureDataDirs();
+        $pluginDir = healthData_pluginDir();
         $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
 
         $exportName = 'healthmd-' . date('Ymd-His');
@@ -534,14 +534,14 @@ if (!function_exists('sleepData_saveRawHealthmd')) {
     }
 }
 
-if (!function_exists('sleepData_saveRecord')) {
+if (!function_exists('healthData_saveRecord')) {
     /**
      * 保存到 JSON 文件，并尽量写入 Typecho 数据库
      * @return array{save_data:array, data_file:string, db_save:bool, db_error:string}
      */
-    function sleepData_saveRecord(array $saveData)
+    function healthData_saveRecord(array $saveData)
     {
-        $dataFile = sleepData_resolveDataFile();
+        $dataFile = healthData_resolveDataFile();
         $existingData = [];
         $dataFoundIndex = -1;
 
@@ -575,7 +575,7 @@ if (!function_exists('sleepData_saveRecord')) {
         $dbError = '开始尝试数据库操作。';
 
         try {
-            $rootDir = sleepData_blogRoot();
+            $rootDir = healthData_blogRoot();
             if (file_exists($rootDir . '/config.inc.php')) {
                 require_once $rootDir . '/config.inc.php';
                 if (class_exists('Typecho_Db')) {
@@ -625,11 +625,11 @@ if (!function_exists('sleepData_saveRecord')) {
     }
 }
 
-if (!function_exists('sleepData_normalizeStage')) {
+if (!function_exists('healthData_normalizeStage')) {
     /**
-     * 归一化 HealthKit / 快捷指令中的睡眠阶段名
+     * 归一化 HealthKit 睡眠阶段名
      */
-    function sleepData_normalizeStage($stage)
+    function healthData_normalizeStage($stage)
     {
         $stage = strtolower(trim((string) $stage));
         $stage = str_replace(['_', '-', ' '], '', $stage);
@@ -664,11 +664,11 @@ if (!function_exists('sleepData_normalizeStage')) {
     }
 }
 
-if (!function_exists('sleepData_preferredTimezone')) {
+if (!function_exists('healthData_preferredTimezone')) {
     /**
      * 插件默认按中国时区解释「昨晚 18:00」窗口；样本自带偏移时仍以样本为准
      */
-    function sleepData_preferredTimezone()
+    function healthData_preferredTimezone()
     {
         $candidates = ['Asia/Shanghai', date_default_timezone_get(), 'UTC'];
         foreach ($candidates as $name) {
@@ -685,8 +685,8 @@ if (!function_exists('sleepData_preferredTimezone')) {
     }
 }
 
-if (!function_exists('sleepData_parseDateTime')) {
-    function sleepData_parseDateTime($value)
+if (!function_exists('healthData_parseDateTime')) {
+    function healthData_parseDateTime($value)
     {
         if ($value instanceof DateTimeInterface) {
             return DateTimeImmutable::createFromInterface($value);
@@ -696,7 +696,7 @@ if (!function_exists('sleepData_parseDateTime')) {
             if ($ts > 20000000000) {
                 $ts = $ts / 1000;
             }
-            return (new DateTimeImmutable('@' . (int) $ts))->setTimezone(sleepData_preferredTimezone());
+            return (new DateTimeImmutable('@' . (int) $ts))->setTimezone(healthData_preferredTimezone());
         }
         $value = trim((string) $value);
         if ($value === '') {
@@ -707,14 +707,14 @@ if (!function_exists('sleepData_parseDateTime')) {
             if (preg_match('/[zZ]|[+-]\d{2}:?\d{2}$/', $value)) {
                 return new DateTimeImmutable($value);
             }
-            return new DateTimeImmutable($value, sleepData_preferredTimezone());
+            return new DateTimeImmutable($value, healthData_preferredTimezone());
         } catch (Exception $e) {
             return null;
         }
     }
 }
 
-if (!function_exists('sleepData_resolveWakeDate')) {
+if (!function_exists('healthData_resolveWakeDate')) {
     /**
      * 将 Health.md noon-to-noon 日记日期规范为「醒来当天」日历日。
      *
@@ -730,21 +730,21 @@ if (!function_exists('sleepData_resolveWakeDate')) {
      * @param string|null $wakeTime HH:mm
      * @return string|null Y-m-d
      */
-    function sleepData_resolveWakeDate(
+    function healthData_resolveWakeDate(
         $sourceDate,
         $bedtimeISO = null,
         $wakeTimeISO = null,
         $sleepTime = null,
         $wakeTime = null
     ) {
-        $tz = sleepData_preferredTimezone();
+        $tz = healthData_preferredTimezone();
 
-        $wakeDt = sleepData_parseDateTime($wakeTimeISO);
+        $wakeDt = healthData_parseDateTime($wakeTimeISO);
         if ($wakeDt) {
             return $wakeDt->setTimezone($tz)->format('Y-m-d');
         }
 
-        $bedDt = sleepData_parseDateTime($bedtimeISO);
+        $bedDt = healthData_parseDateTime($bedtimeISO);
         if ($bedDt && is_string($wakeTime) && preg_match('/^(\d{1,2}):(\d{2})/', trim($wakeTime), $m)) {
             $localBed = $bedDt->setTimezone($tz);
             $candidate = $localBed->setTime((int) $m[1], (int) $m[2], 0);
@@ -772,14 +772,14 @@ if (!function_exists('sleepData_resolveWakeDate')) {
     }
 }
 
-if (!function_exists('sleepData_aggregateSamples')) {
+if (!function_exists('healthData_aggregateSamples')) {
     /**
      * 从原始睡眠样本汇总一夜数据
      * @param array $samples [{stage|value, start|start_date, end|end_date}, ...]
      * @param string|null $targetDate Y-m-d，表示「醒来当天」
      * @return array|null
      */
-    function sleepData_aggregateSamples(array $samples, $targetDate = null)
+    function healthData_aggregateSamples(array $samples, $targetDate = null)
     {
         $parsed = [];
         foreach ($samples as $sample) {
@@ -787,13 +787,13 @@ if (!function_exists('sleepData_aggregateSamples')) {
                 continue;
             }
             $stageRaw = $sample['stage'] ?? $sample['value'] ?? $sample['name'] ?? $sample['Value'] ?? '';
-            $start = sleepData_parseDateTime($sample['start'] ?? $sample['start_date'] ?? $sample['Start Date'] ?? null);
-            $end = sleepData_parseDateTime($sample['end'] ?? $sample['end_date'] ?? $sample['End Date'] ?? null);
+            $start = healthData_parseDateTime($sample['start'] ?? $sample['start_date'] ?? $sample['Start Date'] ?? null);
+            $end = healthData_parseDateTime($sample['end'] ?? $sample['end_date'] ?? $sample['End Date'] ?? null);
             if (!$start || !$end || $end <= $start) {
                 continue;
             }
             $parsed[] = [
-                'stage' => sleepData_normalizeStage($stageRaw),
+                'stage' => healthData_normalizeStage($stageRaw),
                 'start' => $start,
                 'end' => $end,
                 'minutes' => (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60),
@@ -808,7 +808,7 @@ if (!function_exists('sleepData_aggregateSamples')) {
             return $a['start'] <=> $b['start'];
         });
 
-        $tz = $parsed[0]['start']->getTimezone() ?: sleepData_preferredTimezone();
+        $tz = $parsed[0]['start']->getTimezone() ?: healthData_preferredTimezone();
 
         if ($targetDate) {
             $windowEnd = new DateTimeImmutable($targetDate . ' 15:00:00', $tz);
@@ -963,12 +963,12 @@ if (!function_exists('sleepData_aggregateSamples')) {
     }
 }
 
-if (!function_exists('sleepData_estimateScore')) {
+if (!function_exists('healthData_estimateScore')) {
     /**
-     * 估算睡眠分数（苹果睡眠评分不可经 HealthKit/快捷指令读取时的兜底）
+     * 估算睡眠分数（苹果睡眠评分不可经 HealthKit 读取时的兜底）
      * 粗略对齐：时长约 50 + 入睡规律约 30 + 中断约 20
      */
-    function sleepData_estimateScore(array $record, array $recentSleepTimes = [])
+    function healthData_estimateScore(array $record, array $recentSleepTimes = [])
     {
         $total = (int) ($record['total_sleep_minutes'] ?? 0);
         $awake = (int) ($record['awake_minutes'] ?? 0);
@@ -990,8 +990,8 @@ if (!function_exists('sleepData_estimateScore')) {
         // 入睡规律：有历史则按与中位数偏差计分，否则给中等分
         $bedtimeScore = 20;
         if (!empty($record['sleep_time']) && count($recentSleepTimes) >= 3) {
-            $current = sleepData_timeToCircularMinutes($record['sleep_time']);
-            $history = array_map('sleepData_timeToCircularMinutes', $recentSleepTimes);
+            $current = healthData_timeToCircularMinutes($record['sleep_time']);
+            $history = array_map('healthData_timeToCircularMinutes', $recentSleepTimes);
             sort($history);
             $median = $history[(int) floor((count($history) - 1) / 2)];
             $delta = abs($current - $median);
@@ -1013,8 +1013,8 @@ if (!function_exists('sleepData_estimateScore')) {
     }
 }
 
-if (!function_exists('sleepData_timeToCircularMinutes')) {
-    function sleepData_timeToCircularMinutes($time)
+if (!function_exists('healthData_timeToCircularMinutes')) {
+    function healthData_timeToCircularMinutes($time)
     {
         $parts = explode(':', (string) $time);
         $h = isset($parts[0]) ? (int) $parts[0] : 0;
@@ -1028,15 +1028,15 @@ if (!function_exists('sleepData_timeToCircularMinutes')) {
     }
 }
 
-if (!function_exists('sleepData_getRecentSleepTimes')) {
+if (!function_exists('healthData_getRecentSleepTimes')) {
     /**
      * 从已存 JSON 读取最近入睡时间，供评分估算
      */
-    function sleepData_getRecentSleepTimes($excludeDate = null, $limit = 13)
+    function healthData_getRecentSleepTimes($excludeDate = null, $limit = 13)
     {
         $times = [];
         try {
-            $dataFile = sleepData_resolveDataFile();
+            $dataFile = healthData_resolveDataFile();
             if (!file_exists($dataFile)) {
                 return $times;
             }
