@@ -76,7 +76,7 @@ curl 'https://blog.ybyq.wang/usr/plugins/HealthData/backfill-from-raw.php?access
 
 ### Handsome 独立页
 
-1. 复制 `health-stats.php` 到 Handsome 主题根目录  
+1. 启用插件后会自动安装 `health-stats.php` 到主题根目录（也可手动复制）  
 2. 后台新建页面，模板选「健康数据」  
 3. 插件设置勾选公开展示分类（默认睡眠/活动/心率/锻炼）
 
@@ -177,6 +177,7 @@ curl -X POST 'https://blog.ybyq.wang/usr/plugins/HealthData/healthmd-api.php' \
 - `health-api.php`
 - `public-health-api.php`
 - `backfill-from-raw.php`
-- `health-stats.php`（复制到 Handsome 主题根目录）
+- `health-stats.php`（启用插件时自动复制到主题根目录）
+- `view-health.php`（可选，免主题查看页）
 - `lib/HealthDataHelper.php`
-- `Plugin.php`（后台会显示 Health.md Endpoint、公开分类与健康亮点）
+- `Plugin.php`
