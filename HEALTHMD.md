@@ -151,5 +151,7 @@ curl -X POST 'https://blog.ybyq.wang/usr/plugins/HealthData/healthmd-api.php' \
 
 - `healthmd-api.php`
 - `health-api.php`
+- `view-health.php`（可选，免主题查看页）
+- `theme-templates/page-health.php`（独立页面模板源文件）
 - `lib/HealthDataHelper.php`
-- `Plugin.php`（后台会显示 Health.md Endpoint 与健康亮点）
+- `Plugin.php`（启用后会把模板复制到当前主题为 `page-health.php`）

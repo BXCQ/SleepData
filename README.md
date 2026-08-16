@@ -31,6 +31,18 @@ Typecho 插件。通过 **Health.md API** 同步苹果健康全日数据（睡�
 3. 勾选 Sleep、Activity、Heart、Vitals 等需要的指标，Schedule 导出到 API Endpoint
 4. 详见 [HEALTHMD.md](./HEALTHMD.md)
 
+### 独立页面展示（主题模板「健康数据」）
+
+启用插件（或打开插件设置）时，会把 `theme-templates/page-health.php` 安装到**当前主题根目录**。
+
+1. Typecho 后台 →「管理」→「独立页面」→「新增页面」
+2. **自定义模板**选择 **健康数据**
+3. 标题随意（如「我的健康」），缩略名如 `health`，发布后访问 `/health.html`（视伪静态规则而定）
+
+若下拉框没有「健康数据」：确认主题目录存在 `page-health.php`，或手动从插件复制该文件到主题根目录后刷新后台。
+
+也可直接打开：`https://你的域名/usr/plugins/HealthData/view-health.php`
+
 ### 方式二：手动 OCR 上传
 
 1. 打开 `https://blog.ybyq.wang/usr/plugins/HealthData/index.html`
