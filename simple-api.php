@@ -85,7 +85,7 @@ try {
             require_once $rootDir . '/config.inc.php';
             if (class_exists('Typecho_Db')) {
                 $db = Typecho_Db::get();
-                $options = $db->fetchRow($db->select()->from('table.options')->where('name = ?', 'plugin:SleepData'));
+                $options = $db->fetchRow($db->select()->from('table.options')->where('name = ?', 'plugin:HealthData'));
                 if ($options && !empty($options['value'])) {
                     $pluginOptions = unserialize($options['value']);
                     if (isset($pluginOptions['accessToken']) && !empty($pluginOptions['accessToken'])) {
@@ -286,7 +286,7 @@ try {
     ]);
 } catch (Exception $e) {
     // 记录错误到日志
-    error_log('SleepData Simple API Error: ' . $e->getMessage());
+    error_log('HealthData Simple API Error: ' . $e->getMessage());
 
     // 返回错误响应
     http_response_code(500);

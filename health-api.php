@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-require_once __DIR__ . '/lib/SleepDataHelper.php';
+require_once __DIR__ . '/lib/HealthDataHelper.php';
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -49,7 +49,7 @@ try {
     } elseif (!empty($_GET['token'])) {
         $queryToken['token'] = $_GET['token'];
     }
-    sleepData_requireValidToken($queryToken);
+    healthData_requireValidToken($queryToken);
 
     $wantFull = !empty($_GET['full']) && $_GET['full'] !== '0';
     $date = isset($_GET['date']) ? preg_replace('/[^0-9\\-]/', '', (string) $_GET['date']) : '';
@@ -57,7 +57,7 @@ try {
     $days = isset($_GET['days']) ? (int) $_GET['days'] : 0;
 
     if ($date !== '') {
-        $day = sleepData_loadHealthDay($date);
+        $day = healthData_loadHealthDay($date);
         if ($day === null) {
             http_response_code(404);
             echo json_encode([
@@ -78,7 +78,7 @@ try {
     }
 
     if ($latest) {
-        $day = sleepData_getLatestHealthDay();
+        $day = healthData_getLatestHealthDay();
         if ($day === null) {
             http_response_code(404);
             echo json_encode([
@@ -101,7 +101,7 @@ try {
         $days = 14;
     }
     $days = min(90, max(1, $days));
-    $index = sleepData_loadHealthIndex($days);
+    $index = healthData_loadHealthIndex($days);
 
     echo json_encode([
         'status' => 'success',
@@ -110,21 +110,21 @@ try {
         'days' => $days,
         'items' => $index,
         'paths' => [
-            'health_index' => sleepData_healthIndexFile(),
-            'health_daily_dir' => sleepData_ensureDataDirs() . '/health/daily',
+            'health_index' => healthData_healthIndexFile(),
+            'health_daily_dir' => healthData_ensureDataDirs() . '/health/daily',
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 } catch (Exception $e) {
     $code = (strpos($e->getMessage(), '令牌') !== false || strpos($e->getMessage(), 'token') !== false) ? 401 : 500;
     if ($code === 401) {
-        // sleepData_requireValidToken 已设状态码时保持
+        // healthData_requireValidToken 已设状态码时保持
         if (http_response_code() < 400) {
             http_response_code(401);
         }
     } else {
         http_response_code(500);
     }
-    error_log('SleepData health-api Error: ' . $e->getMessage());
+    error_log('HealthData health-api Error: ' . $e->getMessage());
     echo json_encode([
         'status' => 'error',
         'message' => $e->getMessage(),

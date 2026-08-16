@@ -2,14 +2,16 @@
 if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 
 /**
- * 睡眠数据记录插件
- * 
- * @package SleepData
+ * 健康数据记录插件
+ *
+ * 通过 Health.md 同步苹果健康全日数据（睡眠、活动、心率、血氧等）。
+ *
+ * @package HealthData
  * @author 璇
- * @version 1.9.0
+ * @version 2.0.0
  * @link https://blog.ybyq.wang
  */
-class SleepData_Plugin implements Typecho_Plugin_Interface
+class HealthData_Plugin implements Typecho_Plugin_Interface
 {
     /**
      * 激活插件方法,如果激活失败,直接抛出异常
@@ -183,7 +185,7 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
     public static function getTodayHealthData($date = null)
     {
         try {
-            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            $helper = dirname(__FILE__) . '/lib/HealthDataHelper.php';
             if (file_exists($helper)) {
                 require_once $helper;
             }
@@ -195,7 +197,7 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
                 }
                 $date = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
             }
-            $day = sleepData_loadHealthDay($date);
+            $day = healthData_loadHealthDay($date);
             return $day['highlights'] ?? null;
         } catch (Exception $e) {
             return null;
@@ -209,11 +211,11 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
     public static function getLatestHealthData()
     {
         try {
-            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            $helper = dirname(__FILE__) . '/lib/HealthDataHelper.php';
             if (file_exists($helper)) {
                 require_once $helper;
             }
-            $day = sleepData_getLatestHealthDay();
+            $day = healthData_getLatestHealthDay();
             return $day['highlights'] ?? null;
         } catch (Exception $e) {
             return null;
@@ -228,18 +230,18 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
     public static function getHealthHighlights($days = 14)
     {
         try {
-            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            $helper = dirname(__FILE__) . '/lib/HealthDataHelper.php';
             if (file_exists($helper)) {
                 require_once $helper;
             }
-            return sleepData_loadHealthIndex($days);
+            return healthData_loadHealthIndex($days);
         } catch (Exception $e) {
             return [];
         }
     }
 
     /**
-     * 获取图表和统计所需的数据
+     * 获取图表和统计所需的睡眠数据
      * @param int $days
      * @return array|null
      */
@@ -411,10 +413,9 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
     public static function config(Typecho_Widget_Helper_Form $form)
     {
         // 获取API地址
-        $api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/simple-api.php';
-        $shortcut_api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/shortcut-api.php';
-        $healthmd_api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/healthmd-api.php';
-        $health_query_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/health-api.php';
+        $api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/simple-api.php';
+        $healthmd_api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/healthmd-api.php';
+        $health_query_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/health-api.php';
 
         // 添加访问令牌设置
         $accessToken = new Typecho_Widget_Helper_Form_Element_Text(
@@ -442,25 +443,22 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
         echo '<p>在 Health.md 填写上述 Endpoint，Token 填本页访问令牌。可勾选 Sleep / Activity / Heart / Vitals 等<strong>全部</strong>指标。</p>';
         echo '<p><strong>全日健康查询：</strong><br><code>' . htmlspecialchars($health_query_url) . '?latest=1&amp;access_token=令牌</code></p>';
         echo '<p>手动上传页 API：<br><code>' . htmlspecialchars($api_url) . '</code></p>';
-        echo '<p>iOS 快捷指令 API：<br><code>' . htmlspecialchars($shortcut_api_url) . '</code></p>';
-        $shortcut_install_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/install-shortcut.html';
-        echo '<p>手机一键导入快捷指令：<br><code>' . htmlspecialchars($shortcut_install_url) . '</code></p>';
-        echo '<p>说明见 <code>HEALTHMD.md</code> / <code>SHORTCUTS.md</code>。</p>';
+        echo '<p>说明见 <code>HEALTHMD.md</code>。</p>';
         echo '<p>重要：使用API时需要在请求中包含访问令牌，否则请求会被拒绝。</p>';
         echo '<p>您可以通过两种方式设置访问令牌：</p>';
         echo '<ol>';
         echo '<li><strong>方法一（推荐）：</strong>直接在上方表单中填写并保存设置。</li>';
-        echo '<li><strong>方法二（备用）：</strong>编辑 <code>usr/plugins/SleepData/data_config.php</code> 文件，修改 API_ACCESS_TOKEN 常量的值。</li>';
+        echo '<li><strong>方法二（备用）：</strong>编辑 <code>usr/plugins/HealthData/data_config.php</code> 文件，修改 API_ACCESS_TOKEN 常量的值。</li>';
         echo '</ol>';
         echo '<p>系统会优先使用方法一设置的令牌，如果未设置则使用方法二中的令牌。</p>';
         echo '</div>';
 
         // 健康亮点预览
         try {
-            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            $helper = dirname(__FILE__) . '/lib/HealthDataHelper.php';
             if (file_exists($helper)) {
                 require_once $helper;
-                $healthRows = sleepData_loadHealthIndex(7);
+                $healthRows = healthData_loadHealthIndex(7);
                 if (!empty($healthRows)) {
                     echo '<h3>' . _t('全日健康亮点 (最近7天)') . '</h3>';
                     echo '<table class="typecho-list-table"><thead><tr>';
