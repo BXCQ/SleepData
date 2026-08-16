@@ -2,3 +2,5 @@
 /data/sleep_data.json
 /data/raw/daily/*.json
 /data/raw/exports/*.json
+/data/health/index.json
+/data/health/daily/*.json

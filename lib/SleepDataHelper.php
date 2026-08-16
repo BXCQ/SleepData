@@ -156,7 +156,7 @@ if (!function_exists('sleepData_requireValidToken')) {
 
 if (!function_exists('sleepData_ensureDataDirs')) {
     /**
-     * 确保插件目录下 data / raw 可写
+     * 确保插件目录下 data / raw / health 可写
      * @return string data 目录绝对路径
      */
     function sleepData_ensureDataDirs()
@@ -167,6 +167,8 @@ if (!function_exists('sleepData_ensureDataDirs')) {
             $base . '/raw',
             $base . '/raw/daily',
             $base . '/raw/exports',
+            $base . '/health',
+            $base . '/health/daily',
         ];
         foreach ($dirs as $dir) {
             if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
@@ -174,6 +176,245 @@ if (!function_exists('sleepData_ensureDataDirs')) {
             }
         }
         return $base;
+    }
+}
+
+if (!function_exists('sleepData_healthIndexFile')) {
+    function sleepData_healthIndexFile()
+    {
+        return sleepData_ensureDataDirs() . '/health/index.json';
+    }
+}
+
+if (!function_exists('sleepData_healthDailyFile')) {
+    function sleepData_healthDailyFile($date)
+    {
+        $date = preg_replace('/[^0-9\\-]/', '', (string) $date);
+        return sleepData_ensureDataDirs() . '/health/daily/' . $date . '.json';
+    }
+}
+
+if (!function_exists('sleepData_stripHealthmdBulkyFields')) {
+    /**
+     * 去掉样本数组 / lossless 归档等大字段，保留日汇总便于主题与查询
+     */
+    function sleepData_stripHealthmdBulkyFields(array $record)
+    {
+        $out = $record;
+        unset($out['healthkit_record_archive'], $out['diagnostics']);
+
+        if (!empty($out['heart']) && is_array($out['heart'])) {
+            unset(
+                $out['heart']['heartRateSamples'],
+                $out['heart']['hrvSamples'],
+                $out['heart']['heartbeatSeries']
+            );
+        }
+        if (!empty($out['vitals']) && is_array($out['vitals'])) {
+            foreach (array_keys($out['vitals']) as $key) {
+                if (substr($key, -7) === 'Samples' || substr($key, -7) === 'samples') {
+                    unset($out['vitals'][$key]);
+                }
+            }
+        }
+        if (!empty($out['sleep']) && is_array($out['sleep'])) {
+            unset($out['sleep']['sleepStages']);
+        }
+        if (!empty($out['workouts']) && is_array($out['workouts'])) {
+            $cleaned = [];
+            foreach ($out['workouts'] as $workout) {
+                if (!is_array($workout)) {
+                    continue;
+                }
+                unset(
+                    $workout['route'],
+                    $workout['routes'],
+                    $workout['locations'],
+                    $workout['routeLocations'],
+                    $workout['workoutEvents'],
+                    $workout['associatedSamples']
+                );
+                $cleaned[] = $workout;
+            }
+            $out['workouts'] = $cleaned;
+        }
+        if (!empty($out['medications']) && is_array($out['medications'])) {
+            // doseEvents 可能较长，索引里不需要；日文件保留但限制条数
+            if (!empty($out['medications']['doseEvents']) && is_array($out['medications']['doseEvents'])
+                && count($out['medications']['doseEvents']) > 50) {
+                $out['medications']['doseEvents'] = array_slice($out['medications']['doseEvents'], 0, 50);
+                $out['medications']['doseEventsTruncated'] = true;
+            }
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('sleepData_healthHighlights')) {
+    /**
+     * 从单日 health_data 提取主题/列表常用亮点（日历日，不做睡眠日换算）
+     */
+    function sleepData_healthHighlights(array $record)
+    {
+        $activity = (isset($record['activity']) && is_array($record['activity'])) ? $record['activity'] : [];
+        $heart = (isset($record['heart']) && is_array($record['heart'])) ? $record['heart'] : [];
+        $vitals = (isset($record['vitals']) && is_array($record['vitals'])) ? $record['vitals'] : [];
+        $body = (isset($record['body']) && is_array($record['body'])) ? $record['body'] : [];
+        $mind = (isset($record['mindfulness']) && is_array($record['mindfulness'])) ? $record['mindfulness'] : [];
+        $sleep = (isset($record['sleep']) && is_array($record['sleep'])) ? $record['sleep'] : [];
+        $workouts = (isset($record['workouts']) && is_array($record['workouts'])) ? $record['workouts'] : [];
+
+        $categories = [];
+        foreach (['sleep', 'activity', 'heart', 'vitals', 'body', 'nutrition', 'mindfulness', 'mobility', 'hearing', 'workouts', 'medications'] as $cat) {
+            if (!empty($record[$cat]) && is_array($record[$cat])) {
+                $categories[] = $cat;
+            }
+        }
+
+        $sleepSeconds = $sleep['totalDuration'] ?? null;
+        $sleepMinutes = null;
+        if ($sleepSeconds !== null && $sleepSeconds !== '' && is_numeric($sleepSeconds)) {
+            $sleepMinutes = (int) round(((float) $sleepSeconds) / 60);
+        }
+
+        return [
+            'date' => $record['date'] ?? null,
+            'steps' => isset($activity['steps']) ? (int) round((float) $activity['steps']) : null,
+            'active_calories' => isset($activity['activeCalories']) ? (float) $activity['activeCalories'] : null,
+            'exercise_minutes' => isset($activity['exerciseMinutes']) ? (int) round((float) $activity['exerciseMinutes']) : null,
+            'stand_hours' => isset($activity['standHours']) ? (int) round((float) $activity['standHours']) : null,
+            'distance_km' => isset($activity['walkingRunningDistanceKm'])
+                ? (float) $activity['walkingRunningDistanceKm']
+                : (isset($activity['walkingRunningDistance']) ? round(((float) $activity['walkingRunningDistance']) / 1000, 3) : null),
+            'resting_heart_rate' => isset($heart['restingHeartRate']) ? (float) $heart['restingHeartRate'] : null,
+            'average_heart_rate' => isset($heart['averageHeartRate']) ? (float) $heart['averageHeartRate'] : null,
+            'hrv' => isset($heart['hrv']) ? (float) $heart['hrv'] : null,
+            'blood_oxygen' => isset($vitals['bloodOxygenAvg'])
+                ? (float) $vitals['bloodOxygenAvg']
+                : (isset($vitals['bloodOxygen']) ? (float) $vitals['bloodOxygen'] : (isset($vitals['bloodOxygenPercent']) ? (float) $vitals['bloodOxygenPercent'] : null)),
+            'weight' => isset($body['weight']) ? (float) $body['weight'] : null,
+            'mindful_minutes' => isset($mind['mindfulMinutes']) ? (float) $mind['mindfulMinutes'] : null,
+            'workout_count' => count($workouts),
+            'sleep_total_minutes' => $sleepMinutes,
+            'categories' => $categories,
+        ];
+    }
+}
+
+if (!function_exists('sleepData_saveHealthDay')) {
+    /**
+     * 保存单日健康摘要（去大字段）并更新 index.json
+     * @return array{daily_file:string, highlights:array}
+     */
+    function sleepData_saveHealthDay(array $record)
+    {
+        $date = isset($record['date']) ? preg_replace('/[^0-9\\-]/', '', (string) $record['date']) : '';
+        if ($date === '') {
+            throw new Exception('健康日摘要缺少 date');
+        }
+
+        sleepData_ensureDataDirs();
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+
+        $summary = sleepData_stripHealthmdBulkyFields($record);
+        $highlights = sleepData_healthHighlights($summary);
+        $highlights['date'] = $date;
+        $highlights['updated_at'] = date('c');
+
+        $payload = [
+            'schema' => 'sleepdata.health_day',
+            'schema_version' => 1,
+            'source_schema' => $record['schema'] ?? null,
+            'source_schema_version' => $record['schema_version'] ?? null,
+            'date' => $date,
+            'updated_at' => $highlights['updated_at'],
+            'highlights' => $highlights,
+            'health' => $summary,
+        ];
+
+        $dailyFile = sleepData_healthDailyFile($date);
+        if (@file_put_contents($dailyFile, json_encode($payload, $flags)) === false) {
+            throw new Exception('无法写入健康日摘要: ' . $dailyFile);
+        }
+
+        $indexFile = sleepData_healthIndexFile();
+        $index = [];
+        if (file_exists($indexFile)) {
+            $decoded = json_decode((string) file_get_contents($indexFile), true);
+            if (is_array($decoded)) {
+                $index = $decoded;
+            }
+        }
+
+        $found = false;
+        foreach ($index as $i => $row) {
+            if (isset($row['date']) && $row['date'] === $date) {
+                $index[$i] = $highlights;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            $index[] = $highlights;
+        }
+
+        usort($index, function ($a, $b) {
+            return strcmp((string) ($b['date'] ?? ''), (string) ($a['date'] ?? ''));
+        });
+
+        // 索引保留最近 400 天亮点，完整日文件仍在 daily/
+        if (count($index) > 400) {
+            $index = array_slice($index, 0, 400);
+        }
+
+        if (@file_put_contents($indexFile, json_encode($index, $flags)) === false) {
+            throw new Exception('无法写入健康索引: ' . $indexFile);
+        }
+
+        return [
+            'daily_file' => $dailyFile,
+            'highlights' => $highlights,
+        ];
+    }
+}
+
+if (!function_exists('sleepData_loadHealthDay')) {
+    function sleepData_loadHealthDay($date)
+    {
+        $file = sleepData_healthDailyFile($date);
+        if (!file_exists($file)) {
+            return null;
+        }
+        $decoded = json_decode((string) file_get_contents($file), true);
+        return is_array($decoded) ? $decoded : null;
+    }
+}
+
+if (!function_exists('sleepData_loadHealthIndex')) {
+    function sleepData_loadHealthIndex($limit = 30)
+    {
+        $file = sleepData_healthIndexFile();
+        if (!file_exists($file)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($file), true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $limit = max(1, (int) $limit);
+        return array_slice($decoded, 0, $limit);
+    }
+}
+
+if (!function_exists('sleepData_getLatestHealthDay')) {
+    function sleepData_getLatestHealthDay()
+    {
+        $index = sleepData_loadHealthIndex(1);
+        if (empty($index[0]['date'])) {
+            return null;
+        }
+        return sleepData_loadHealthDay($index[0]['date']);
     }
 }
 

@@ -6,7 +6,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 
  * @package SleepData
  * @author 璇
- * @version 1.8.1
+ * @version 1.9.0
  * @link https://blog.ybyq.wang
  */
 class SleepData_Plugin implements Typecho_Plugin_Interface
@@ -171,6 +171,70 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
             );
         } catch (Exception $e) {
             return null;
+        }
+    }
+
+    /**
+     * 获取指定日（或今天）的全日健康亮点（步数、心率等）
+     * 数据来自 Health.md 导出后的 data/health/
+     * @param string|null $date Y-m-d，null 表示今天
+     * @return array|null highlights
+     */
+    public static function getTodayHealthData($date = null)
+    {
+        try {
+            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            if (file_exists($helper)) {
+                require_once $helper;
+            }
+            if ($date === null) {
+                try {
+                    $tz = new DateTimeZone('Asia/Shanghai');
+                } catch (Exception $e) {
+                    $tz = new DateTimeZone(date_default_timezone_get() ?: 'UTC');
+                }
+                $date = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
+            }
+            $day = sleepData_loadHealthDay($date);
+            return $day['highlights'] ?? null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 最近一日全日健康亮点
+     * @return array|null
+     */
+    public static function getLatestHealthData()
+    {
+        try {
+            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            if (file_exists($helper)) {
+                require_once $helper;
+            }
+            $day = sleepData_getLatestHealthDay();
+            return $day['highlights'] ?? null;
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 最近 N 天健康亮点列表
+     * @param int $days
+     * @return array
+     */
+    public static function getHealthHighlights($days = 14)
+    {
+        try {
+            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            if (file_exists($helper)) {
+                require_once $helper;
+            }
+            return sleepData_loadHealthIndex($days);
+        } catch (Exception $e) {
+            return [];
         }
     }
 
@@ -350,6 +414,7 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
         $api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/simple-api.php';
         $shortcut_api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/shortcut-api.php';
         $healthmd_api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/healthmd-api.php';
+        $health_query_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/health-api.php';
 
         // 添加访问令牌设置
         $accessToken = new Typecho_Widget_Helper_Form_Element_Text(
@@ -373,8 +438,9 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
 
         echo '<div class="api-info">';
         echo '<h3>API 信息</h3>';
-        echo '<p><strong>推荐 · Health.md API Export：</strong><br><code>' . htmlspecialchars($healthmd_api_url) . '</code></p>';
-        echo '<p>在 Health.md 填写上述 Endpoint，Token 填本页访问令牌（App 会以 Bearer 发送）。</p>';
+        echo '<p><strong>推荐 · Health.md API Export（写入）：</strong><br><code>' . htmlspecialchars($healthmd_api_url) . '</code></p>';
+        echo '<p>在 Health.md 填写上述 Endpoint，Token 填本页访问令牌。可勾选 Sleep / Activity / Heart / Vitals 等<strong>全部</strong>指标。</p>';
+        echo '<p><strong>全日健康查询：</strong><br><code>' . htmlspecialchars($health_query_url) . '?latest=1&amp;access_token=令牌</code></p>';
         echo '<p>手动上传页 API：<br><code>' . htmlspecialchars($api_url) . '</code></p>';
         echo '<p>iOS 快捷指令 API：<br><code>' . htmlspecialchars($shortcut_api_url) . '</code></p>';
         $shortcut_install_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/install-shortcut.html';
@@ -388,6 +454,35 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
         echo '</ol>';
         echo '<p>系统会优先使用方法一设置的令牌，如果未设置则使用方法二中的令牌。</p>';
         echo '</div>';
+
+        // 健康亮点预览
+        try {
+            $helper = dirname(__FILE__) . '/lib/SleepDataHelper.php';
+            if (file_exists($helper)) {
+                require_once $helper;
+                $healthRows = sleepData_loadHealthIndex(7);
+                if (!empty($healthRows)) {
+                    echo '<h3>' . _t('全日健康亮点 (最近7天)') . '</h3>';
+                    echo '<table class="typecho-list-table"><thead><tr>';
+                    echo '<th>日期</th><th>步数</th><th>活动热量</th><th>静息心率</th><th>HRV</th><th>睡眠(分)</th><th>分类</th>';
+                    echo '</tr></thead><tbody>';
+                    foreach ($healthRows as $row) {
+                        echo '<tr>';
+                        echo '<td>' . htmlspecialchars($row['date'] ?? '') . '</td>';
+                        echo '<td>' . htmlspecialchars((string) ($row['steps'] ?? '-')) . '</td>';
+                        echo '<td>' . htmlspecialchars((string) ($row['active_calories'] ?? '-')) . '</td>';
+                        echo '<td>' . htmlspecialchars((string) ($row['resting_heart_rate'] ?? '-')) . '</td>';
+                        echo '<td>' . htmlspecialchars((string) ($row['hrv'] ?? '-')) . '</td>';
+                        echo '<td>' . htmlspecialchars((string) ($row['sleep_total_minutes'] ?? '-')) . '</td>';
+                        echo '<td>' . htmlspecialchars(implode(',', $row['categories'] ?? [])) . '</td>';
+                        echo '</tr>';
+                    }
+                    echo '</tbody></table>';
+                }
+            }
+        } catch (Exception $e) {
+            // ignore
+        }
 
         echo '<h3>' . _t('数据库中的睡眠数据 (最近50条)') . '</h3>';
 
