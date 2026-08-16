@@ -47,10 +47,21 @@
 | `coreSleep`（秒） | `light_sleep_minutes`（浅睡/核心） |
 | `remSleep`（秒） | `rem_sleep_minutes` |
 | `awakeTime`（秒） | `awake_minutes` |
+| `inBedTime`（秒） | 无阶段时长时回退为 `total_sleep_minutes` |
 | `totalDuration`（秒） | `total_sleep_minutes` |
 | `bedtime` / `bedtimeISO` | `sleep_time` |
 | `wakeTime` / `wakeTimeISO` | `wake_up_time` |
-| `date` | `date` |
+| `date`（noon-to-noon 日记日） | 换算为**醒来当天**日历日后写入 `date` |
+
+### 当日 / 起床日说明（重要）
+
+Health.md 睡眠摘要按 **正午 → 次日正午** 归属一夜，所以「昨晚 23:30 睡、今早 07:15 醒」通常落在**昨天的** `records[].date` 上。
+
+本插件入库时会规范为**醒来当天**的日历日（优先 `wakeTimeISO`，否则按午前起床则日记日 +1），以便主题「今日睡眠」能查到。
+
+响应里的 `saved[].source_date` 是 Health.md 原始日记日，`saved[].date` 是入库用的起床日。原始 JSON 仍按 Health.md 原 `date` 写到 `data/raw/daily/`。
+
+定时导出一般到「昨天」；若要当天上午立刻看到今早这夜，在 Health.md 里对今天再跑一次 **Today Refresh / 手动导出**。
 
 苹果 Sleep Score / OPPO 分数通常进不了 HealthKit；未带分数时接口会估算并标记 `score_estimated`。
 
@@ -69,7 +80,7 @@ curl -X POST 'https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php' \
     "records": [{
       "schema": "healthmd.health_data",
       "schema_version": 7,
-      "date": "2026-08-16",
+      "date": "2026-08-15",
       "sleep": {
         "deepSleep": 5400,
         "coreSleep": 14400,
@@ -77,13 +88,15 @@ curl -X POST 'https://blog.ybyq.wang/usr/plugins/SleepData/healthmd-api.php' \
         "awakeTime": 900,
         "totalDuration": 27900,
         "bedtime": "23:30",
-        "wakeTime": "07:15"
+        "wakeTime": "07:15",
+        "bedtimeISO": "2026-08-15T23:30:00+08:00",
+        "wakeTimeISO": "2026-08-16T07:15:00+08:00"
       }
     }]
   }'
 ```
 
-成功返回 `"status":"success"`，并在插件后台 / 主题侧边栏可见。
+成功时 `saved[].date` 应为 **`2026-08-16`**（起床日），`source_date` 为 `2026-08-15`。
 
 ## 上传到服务器的文件
 
