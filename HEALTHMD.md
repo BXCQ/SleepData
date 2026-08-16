@@ -2,6 +2,26 @@
 
 推荐用 [Health.md](https://healthmd.isolated.tech/) 的 **API Export**，把苹果健康（含 OPPO 同步进去的睡眠）定时 POST 到本插件。
 
+## 服务器存储位置（插件目录内）
+
+默认都在 `usr/plugins/SleepData/data/`：
+
+| 内容 | 路径 |
+|------|------|
+| 睡眠摘要（列表） | `data/sleep_data.json` |
+| Health.md 完整请求包 | `data/raw/exports/healthmd-*.json` |
+| 单日原始文档（按日覆盖） | `data/raw/daily/YYYY-MM-DD.json` |
+
+绝对路径示例：
+
+```text
+/path/to/blog/usr/plugins/SleepData/data/sleep_data.json
+/path/to/blog/usr/plugins/SleepData/data/raw/exports/
+/path/to/blog/usr/plugins/SleepData/data/raw/daily/
+```
+
+请确保 Web 对 `data/` 目录可写（一般 `755`/`775`，属主为 PHP 运行用户）。
+
 ## 在 Health.md 里怎么填
 
 打开 **API Export** 弹窗：

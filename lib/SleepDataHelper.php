@@ -154,51 +154,142 @@ if (!function_exists('sleepData_requireValidToken')) {
     }
 }
 
+if (!function_exists('sleepData_ensureDataDirs')) {
+    /**
+     * 确保插件目录下 data / raw 可写
+     * @return string data 目录绝对路径
+     */
+    function sleepData_ensureDataDirs()
+    {
+        $base = sleepData_pluginDir() . '/data';
+        $dirs = [
+            $base,
+            $base . '/raw',
+            $base . '/raw/daily',
+            $base . '/raw/exports',
+        ];
+        foreach ($dirs as $dir) {
+            if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+                throw new Exception('无法创建数据目录: ' . $dir);
+            }
+        }
+        return $base;
+    }
+}
+
 if (!function_exists('sleepData_resolveDataFile')) {
     /**
-     * 解析可写的数据文件路径
+     * 解析睡眠摘要 JSON 路径（默认：插件目录/data/sleep_data.json）
      */
     function sleepData_resolveDataFile()
     {
+        $dataDir = sleepData_ensureDataDirs();
+        $preferred = $dataDir . '/sleep_data.json';
         $configFile = sleepData_pluginDir() . '/data_config.php';
         $dataFile = '';
 
         if (file_exists($configFile)) {
             include_once $configFile;
-            if (defined('SLEEP_DATA_FILE')) {
+            if (defined('SLEEP_DATA_FILE') && SLEEP_DATA_FILE !== '') {
                 $dataFile = SLEEP_DATA_FILE;
             }
         }
 
-        if ($dataFile === '') {
-            $pluginDir = sleepData_pluginDir();
-            $possibleDirs = [
-                sys_get_temp_dir(),
-                '/tmp',
-                dirname($pluginDir) . '/uploads',
-                dirname(dirname($pluginDir)) . '/tmp',
-            ];
-
-            foreach ($possibleDirs as $dir) {
-                if (is_dir($dir) && is_writable($dir)) {
-                    $dataFile = rtrim($dir, '/') . '/sleep_data.json';
-                    break;
-                }
+        // 旧默认 /tmp 迁到插件 data 目录
+        if ($dataFile === '' || preg_match('#^/tmp/#', $dataFile) || $dataFile === '/tmp/sleep_data.json') {
+            if ($dataFile !== '' && $dataFile !== $preferred && file_exists($dataFile) && !file_exists($preferred)) {
+                @copy($dataFile, $preferred);
             }
-
-            if ($dataFile === '') {
-                $dataFile = $pluginDir . '/sleep_data.json';
-            }
+            $dataFile = $preferred;
 
             $tokenLine = '';
-            if (defined('API_ACCESS_TOKEN')) {
+            if (defined('API_ACCESS_TOKEN') && API_ACCESS_TOKEN !== '') {
                 $tokenLine = "define('API_ACCESS_TOKEN', '" . addslashes(API_ACCESS_TOKEN) . "');\n";
+            } elseif (file_exists($configFile)) {
+                // 保留已有 token：重新 include 不安全，仅写路径时尽量读回
+                $existing = @file_get_contents($configFile);
+                if ($existing && preg_match("/define\\('API_ACCESS_TOKEN',\\s*'([^']*)'\\)/", $existing, $m)) {
+                    $tokenLine = "define('API_ACCESS_TOKEN', '" . addslashes($m[1]) . "');\n";
+                }
             }
-            $configContent = "<?php\ndefine('SLEEP_DATA_FILE', '" . addslashes($dataFile) . "');\n" . $tokenLine;
+            $configContent = "<?php\n"
+                . "define('SLEEP_DATA_FILE', __DIR__ . '/data/sleep_data.json');\n"
+                . $tokenLine;
             @file_put_contents($configFile, $configContent);
         }
 
+        $dir = dirname($dataFile);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+
         return $dataFile;
+    }
+}
+
+if (!function_exists('sleepData_saveRawHealthmd')) {
+    /**
+     * 保存 Health.md 原始 JSON 到插件 data/raw 下
+     * - 完整请求包：data/raw/exports/healthmd-时间戳.json
+     * - 单日文档：data/raw/daily/YYYY-MM-DD.json（按日覆盖）
+     *
+     * @param array $data 已解析的 envelope
+     * @param string|null $rawBody 原始请求体（优先原样落盘）
+     * @return array{export_file:?string, daily_files:array<string>}
+     */
+    function sleepData_saveRawHealthmd(array $data, $rawBody = null)
+    {
+        sleepData_ensureDataDirs();
+        $pluginDir = sleepData_pluginDir();
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+
+        $exportName = 'healthmd-' . date('Ymd-His');
+        if (!empty($data['exported_at'])) {
+            $safe = preg_replace('/[^0-9A-Za-z\\-]/', '', str_replace([':', 'T', 'Z', '+'], ['', '-', '', '-'], (string) $data['exported_at']));
+            if ($safe !== '') {
+                $exportName = 'healthmd-' . substr($safe, 0, 32);
+            }
+        }
+        $exportFile = $pluginDir . '/data/raw/exports/' . $exportName . '.json';
+
+        if (is_string($rawBody) && trim($rawBody) !== '') {
+            // 尽量保留原始正文；若不是漂亮格式也照存
+            $written = @file_put_contents($exportFile, $rawBody);
+        } else {
+            $written = @file_put_contents($exportFile, json_encode($data, $flags));
+        }
+        if ($written === false) {
+            throw new Exception('无法写入原始导出文件: ' . $exportFile);
+        }
+
+        $records = [];
+        if (!empty($data['records']) && is_array($data['records'])) {
+            $records = $data['records'];
+        } elseif (!empty($data['date'])) {
+            $records = [$data];
+        }
+
+        $dailyFiles = [];
+        foreach ($records as $record) {
+            if (!is_array($record) || empty($record['date'])) {
+                continue;
+            }
+            $date = preg_replace('/[^0-9\\-]/', '', (string) $record['date']);
+            if ($date === '') {
+                continue;
+            }
+            $dailyFile = $pluginDir . '/data/raw/daily/' . $date . '.json';
+            $ok = @file_put_contents($dailyFile, json_encode($record, $flags));
+            if ($ok === false) {
+                throw new Exception('无法写入单日原始文件: ' . $dailyFile);
+            }
+            $dailyFiles[] = $dailyFile;
+        }
+
+        return [
+            'export_file' => $exportFile,
+            'daily_files' => $dailyFiles,
+        ];
     }
 }
 

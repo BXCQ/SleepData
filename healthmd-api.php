@@ -189,6 +189,9 @@ try {
     // Health.md 用 Authorization: Bearer；body 一般不含 token
     $tokenInfo = sleepData_requireValidToken($data);
 
+    // 先落盘原始 JSON（插件 data/raw/），再解析睡眠摘要
+    $rawSaved = sleepData_saveRawHealthmd($data, is_string($raw) ? $raw : null);
+
     $records = [];
     if (isset($data['records']) && is_array($data['records'])) {
         $records = $data['records'];
@@ -209,9 +212,10 @@ try {
         // Health.md 文档：空批次也可能合法；返回 200 避免重试风暴
         echo json_encode([
             'status' => 'success',
-            'message' => '空 records，已忽略',
+            'message' => '空 records，已忽略（原始包仍已保存）',
             'saved' => [],
             'skipped' => 0,
+            'raw' => $rawSaved,
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -277,6 +281,7 @@ try {
             'total_sleep_minutes' => $saveData['total_sleep_minutes'],
             'score_estimated' => $scoreEstimated,
             'db_save' => $result['db_save'],
+            'sleep_data_file' => $result['data_file'],
         ];
     }
 
@@ -294,9 +299,15 @@ try {
         'exported_at' => $data['exported_at'] ?? null,
         'saved' => $saved,
         'skipped' => $skipped,
+        'raw' => $rawSaved,
+        'paths' => [
+            'sleep_summary' => sleepData_resolveDataFile(),
+            'raw_export' => $rawSaved['export_file'] ?? null,
+            'raw_daily' => $rawSaved['daily_files'] ?? [],
+        ],
         'meta' => [
             'token_source' => $tokenInfo['from_system'] ? 'typecho_config' : (empty($tokenInfo['token']) ? 'none' : 'config_file'),
-            'note' => '同一 date 重复导出将 upsert 覆盖。苹果 Sleep Score 通常不可用，未提供分数时会估算。',
+            'note' => '同一 date 重复导出将 upsert 覆盖。原始 JSON 与睡眠摘要均保存在插件 data/ 目录。',
         ],
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 } catch (Exception $e) {

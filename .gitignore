@@ -1,0 +1,4 @@
+# 插件本地数据目录（运行时生成，勿提交真实健康数据）
+/data/sleep_data.json
+/data/raw/daily/*.json
+/data/raw/exports/*.json
