@@ -6,7 +6,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 
  * @package SleepData
  * @author 璇
- * @version 1.7.0
+ * @version 1.8.0
  * @link https://blog.ybyq.wang
  */
 class SleepData_Plugin implements Typecho_Plugin_Interface
