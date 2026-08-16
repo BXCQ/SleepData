@@ -6,7 +6,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 
  * @package SleepData
  * @author 璇
- * @version 1.6.0
+ * @version 1.7.0
  * @link https://blog.ybyq.wang
  */
 class SleepData_Plugin implements Typecho_Plugin_Interface
@@ -324,6 +324,7 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
         // 获取API地址
         $api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/simple-api.php';
         $shortcut_api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/shortcut-api.php';
+        $healthmd_api_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/healthmd-api.php';
 
         // 添加访问令牌设置
         $accessToken = new Typecho_Widget_Helper_Form_Element_Text(
@@ -347,11 +348,13 @@ class SleepData_Plugin implements Typecho_Plugin_Interface
 
         echo '<div class="api-info">';
         echo '<h3>API 信息</h3>';
+        echo '<p><strong>推荐 · Health.md API Export：</strong><br><code>' . htmlspecialchars($healthmd_api_url) . '</code></p>';
+        echo '<p>在 Health.md 填写上述 Endpoint，Token 填本页访问令牌（App 会以 Bearer 发送）。</p>';
         echo '<p>手动上传页 API：<br><code>' . htmlspecialchars($api_url) . '</code></p>';
-        echo '<p>iOS 快捷指令自动上传 API：<br><code>' . htmlspecialchars($shortcut_api_url) . '</code></p>';
+        echo '<p>iOS 快捷指令 API：<br><code>' . htmlspecialchars($shortcut_api_url) . '</code></p>';
         $shortcut_install_url = Helper::options()->siteUrl . 'usr/plugins/SleepData/install-shortcut.html';
         echo '<p>手机一键导入快捷指令：<br><code>' . htmlspecialchars($shortcut_install_url) . '</code></p>';
-        echo '<p>快捷指令配置说明见插件目录 <code>SHORTCUTS.md</code>（OPPO 手表 → OPPO 健康 → 苹果健康 → 快捷指令）。</p>';
+        echo '<p>说明见 <code>HEALTHMD.md</code> / <code>SHORTCUTS.md</code>。</p>';
         echo '<p>重要：使用API时需要在请求中包含访问令牌，否则请求会被拒绝。</p>';
         echo '<p>您可以通过两种方式设置访问令牌：</p>';
         echo '<ol>';
