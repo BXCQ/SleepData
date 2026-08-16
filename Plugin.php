@@ -8,7 +8,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  *
  * @package HealthData
  * @author 璇
- * @version 2.0.0
+ * @version 2.1.0
  * @link https://blog.ybyq.wang
  */
 class HealthData_Plugin implements Typecho_Plugin_Interface
@@ -72,7 +72,71 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
             $db->query('ALTER TABLE `' . $tableName . '` MODIFY COLUMN `date` DATE DEFAULT NULL;');
         }
 
-        return _t('插件已经激活，数据表已更新！');
+        $tplMsg = self::installThemeTemplate(true);
+        return _t('插件已经激活，数据表已更新！') . ' ' . $tplMsg;
+    }
+
+    /**
+     * 将「健康数据」独立页面模板安装到当前主题目录
+     * Typecho 自定义模板必须放在主题根目录才会出现在「新增独立页面」的模板下拉框中。
+     *
+     * @param bool $overwrite 是否覆盖已存在但版本较旧/缺失标记的文件
+     * @return string 结果说明
+     */
+    public static function installThemeTemplate($overwrite = false)
+    {
+        $src = dirname(__FILE__) . '/theme-templates/page-health.php';
+        if (!file_exists($src)) {
+            return _t('未找到内置模板 theme-templates/page-health.php');
+        }
+
+        try {
+            $theme = Helper::options()->theme;
+        } catch (Exception $e) {
+            return _t('无法读取当前主题');
+        }
+
+        $themeDir = rtrim(__TYPECHO_ROOT_DIR__, '/\\') . '/usr/themes/' . $theme;
+        if (!is_dir($themeDir)) {
+            $alt = rtrim(__TYPECHO_ROOT_DIR__, '/\\') . (defined('__TYPECHO_THEME_DIR__') ? __TYPECHO_THEME_DIR__ : '/usr/themes') . '/' . $theme;
+            $themeDir = is_dir($alt) ? $alt : $themeDir;
+        }
+
+        if (!is_dir($themeDir)) {
+            return _t('主题目录不存在：') . $themeDir;
+        }
+
+        $dest = $themeDir . '/page-health.php';
+        $marker = 'HealthData-page-health@';
+        $needCopy = !file_exists($dest);
+
+        if (!$needCopy && $overwrite) {
+            $needCopy = true;
+        } elseif (!$needCopy && file_exists($dest)) {
+            $existing = @file_get_contents($dest);
+            if ($existing === false || strpos($existing, $marker) === false) {
+                // 已有同名文件且非本插件模板，不覆盖
+                return _t('主题已有 page-health.php（非本插件模板），未覆盖。请手动处理或改名后重新启用插件。');
+            }
+            // 版本不同则更新
+            if (strpos($existing, $marker . '2.1.0') === false) {
+                $needCopy = true;
+            }
+        }
+
+        if (!$needCopy) {
+            return _t('独立页面模板「健康数据」已就绪（page-health.php）。');
+        }
+
+        if (!is_writable($themeDir) && !(file_exists($dest) && is_writable($dest))) {
+            return _t('主题目录不可写，请手动复制 ') . $src . _t(' 到 ') . $dest;
+        }
+
+        if (!@copy($src, $dest)) {
+            return _t('复制模板失败，请手动复制到：') . $dest;
+        }
+
+        return _t('已安装独立页面模板「健康数据」。请到「管理 → 独立页面 → 新增」选择该模板。');
     }
 
     /**
@@ -412,10 +476,14 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
      */
     public static function config(Typecho_Widget_Helper_Form $form)
     {
+        // 打开设置时顺带安装/更新主题独立页面模板
+        $tplStatus = self::installThemeTemplate(false);
+
         // 获取API地址
         $api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/simple-api.php';
         $healthmd_api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/healthmd-api.php';
         $health_query_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/health-api.php';
+        $view_health_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/view-health.php';
 
         // 添加访问令牌设置
         $accessToken = new Typecho_Widget_Helper_Form_Element_Text(
@@ -436,6 +504,18 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
             .api-info { background-color: #f0f8ff; padding: 10px 15px; border-radius: 5px; margin-bottom: 20px; }
             .api-info code { background: #e1e4e8; padding: 2px 6px; border-radius: 3px; font-size: 14px; }
         </style>';
+
+        echo '<div class="api-info">';
+        echo '<h3>独立页面模板「健康数据」</h3>';
+        echo '<p>' . htmlspecialchars($tplStatus) . '</p>';
+        echo '<ol>';
+        echo '<li>进入 Typecho「管理 → 独立页面 → 新增页面」</li>';
+        echo '<li>自定义模板下拉框选择 <strong>健康数据</strong></li>';
+        echo '<li>填写标题（如「我的健康」）、设置缩略名（如 <code>health</code>）后发布</li>';
+        echo '</ol>';
+        echo '<p>若下拉框没有该项：确认主题目录已有 <code>page-health.php</code>，或重新启用本插件；也可手动从插件 <code>theme-templates/page-health.php</code> 复制到当前主题根目录。</p>';
+        echo '<p>无需主题模板时也可直接打开：<br><code>' . htmlspecialchars($view_health_url) . '</code></p>';
+        echo '</div>';
 
         echo '<div class="api-info">';
         echo '<h3>API 信息</h3>';
