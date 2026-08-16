@@ -8,7 +8,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  *
  * @package HealthData
  * @author 璇
- * @version 2.0.0
+ * @version 2.1.0
  * @link https://blog.ybyq.wang
  */
 class HealthData_Plugin implements Typecho_Plugin_Interface
@@ -72,7 +72,22 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
             $db->query('ALTER TABLE `' . $tableName . '` MODIFY COLUMN `date` DATE DEFAULT NULL;');
         }
 
-        return _t('插件已经激活，数据表已更新！');
+        // 若已有 Health.md raw 日文件，激活时回填全日健康索引
+        $backfillMsg = '';
+        try {
+            $helper = dirname(__FILE__) . '/lib/HealthDataHelper.php';
+            if (file_exists($helper)) {
+                require_once $helper;
+                $bf = healthData_backfillFromRaw();
+                if (!empty($bf['saved'])) {
+                    $backfillMsg = '；已从 raw 回填健康摘要 ' . (int) $bf['saved'] . ' 天';
+                }
+            }
+        } catch (Exception $e) {
+            // 回填失败不阻止激活
+        }
+
+        return _t('插件已经激活，数据表已更新！') . $backfillMsg;
     }
 
     /**
@@ -416,6 +431,8 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
         $api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/simple-api.php';
         $healthmd_api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/healthmd-api.php';
         $health_query_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/health-api.php';
+        $public_api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/public-health-api.php';
+        $backfill_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/backfill-from-raw.php';
 
         // 添加访问令牌设置
         $accessToken = new Typecho_Widget_Helper_Form_Element_Text(
@@ -426,6 +443,17 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
             _t('设置一个自定义的访问令牌，用于API认证。请使用复杂字符串，留空表示不启用认证。')
         );
         $form->addInput($accessToken);
+
+        require_once dirname(__FILE__) . '/lib/HealthDataHelper.php';
+        $catOptions = healthData_publicCategoryDefaults();
+        $publicCategories = new Typecho_Widget_Helper_Form_Element_Checkbox(
+            'publicCategories',
+            $catOptions,
+            ['sleep', 'activity', 'heart', 'workouts'],
+            _t('独立页公开展示的分类'),
+            _t('仅影响 Handsome「健康数据」独立页与 public-health-api.php。心态/听力/行动能力等建议保持关闭。')
+        );
+        $form->addInput($publicCategories);
 
         // 直接输出HTML以获得最大兼容性
         echo '<style>
@@ -441,10 +469,13 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
         echo '<h3>API 信息</h3>';
         echo '<p><strong>推荐 · Health.md API Export（写入）：</strong><br><code>' . htmlspecialchars($healthmd_api_url) . '</code></p>';
         echo '<p>在 Health.md 填写上述 Endpoint，Token 填本页访问令牌。可勾选 Sleep / Activity / Heart / Vitals 等<strong>全部</strong>指标。</p>';
-        echo '<p><strong>全日健康查询：</strong><br><code>' . htmlspecialchars($health_query_url) . '?latest=1&amp;access_token=令牌</code></p>';
+        echo '<p><strong>全日健康查询（需令牌）：</strong><br><code>' . htmlspecialchars($health_query_url) . '?latest=1&amp;access_token=令牌</code></p>';
+        echo '<p><strong>独立页公开接口（无需令牌，按上方勾选过滤）：</strong><br><code>' . htmlspecialchars($public_api_url) . '?days=30</code></p>';
         echo '<p>手动上传页 API：<br><code>' . htmlspecialchars($api_url) . '</code></p>';
-        echo '<p>说明见 <code>HEALTHMD.md</code>。</p>';
-        echo '<p>重要：使用API时需要在请求中包含访问令牌，否则请求会被拒绝。</p>';
+        echo '<p><strong>从 raw 回填健康索引（需令牌）：</strong><br><code>' . htmlspecialchars($backfill_url) . '?access_token=令牌</code></p>';
+        echo '<p><strong>Handsome 独立页：</strong>将插件内 <code>health-stats.php</code> 复制到主题根目录，后台新建页面并选择模板「健康数据」。</p>';
+        echo '<p>说明见 <code>HEALTHMD.md</code> / <code>README.md</code>。</p>';
+        echo '<p>重要：写入类 API 需要访问令牌；公开独立页接口不需要，但只返回已勾选分类。</p>';
         echo '<p>您可以通过两种方式设置访问令牌：</p>';
         echo '<ol>';
         echo '<li><strong>方法一（推荐）：</strong>直接在上方表单中填写并保存设置。</li>';

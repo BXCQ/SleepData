@@ -38,23 +38,47 @@
 
 ## 查询全日健康
 
-写入用 `healthmd-api.php`；读取用 `health-api.php`：
+写入用 `healthmd-api.php`；需令牌读取用 `health-api.php`；**独立页公开读取**用 `public-health-api.php`（按后台勾选分类过滤，无需令牌）：
 
 ```bash
-# 最近一天亮点
+# 最近一天亮点（需令牌）
 curl 'https://blog.ybyq.wang/usr/plugins/HealthData/health-api.php?latest=1&access_token=你的令牌'
 
-# 指定日完整摘要
+# 指定日完整摘要（需令牌）
 curl 'https://blog.ybyq.wang/usr/plugins/HealthData/health-api.php?date=2026-08-16&full=1&access_token=你的令牌'
 
-# 最近 30 天亮点列表
+# 最近 30 天亮点列表（需令牌）
 curl 'https://blog.ybyq.wang/usr/plugins/HealthData/health-api.php?days=30&access_token=你的令牌'
+
+# 独立页公开列表（无需令牌）
+curl 'https://blog.ybyq.wang/usr/plugins/HealthData/public-health-api.php?days=30'
+curl 'https://blog.ybyq.wang/usr/plugins/HealthData/public-health-api.php?start=2026-08-01&end=2026-08-15'
 ```
+
+### 从 raw 回填
+
+若升级前只有 `data/raw/daily/`、还没有 `data/health/`：
+
+```bash
+# CLI
+php /path/to/usr/plugins/HealthData/backfill-from-raw.php
+
+# 或 HTTP（需令牌）
+curl 'https://blog.ybyq.wang/usr/plugins/HealthData/backfill-from-raw.php?access_token=你的令牌'
+```
+
+启用插件时若检测到 raw 也会自动回填一次。
 
 主题侧也可调用：
 
 - `HealthData_Plugin::getTodayHealthData()` / `getLatestHealthData()` / `getHealthHighlights(14)`
 - `HealthData_Plugin::getTodaySleepData()` / `getLatestSleepData()`（睡眠表）
+
+### Handsome 独立页
+
+1. 复制 `health-stats.php` 到 Handsome 主题根目录  
+2. 后台新建页面，模板选「健康数据」  
+3. 插件设置勾选公开展示分类（默认睡眠/活动/心率/锻炼）
 
 ## 睡眠映射
 
@@ -151,5 +175,8 @@ curl -X POST 'https://blog.ybyq.wang/usr/plugins/HealthData/healthmd-api.php' \
 
 - `healthmd-api.php`
 - `health-api.php`
+- `public-health-api.php`
+- `backfill-from-raw.php`
+- `health-stats.php`（复制到 Handsome 主题根目录）
 - `lib/HealthDataHelper.php`
-- `Plugin.php`（后台会显示 Health.md Endpoint 与健康亮点）
+- `Plugin.php`（后台会显示 Health.md Endpoint、公开分类与健康亮点）

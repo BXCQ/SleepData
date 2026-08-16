@@ -1,6 +1,6 @@
 <?php
 /**
- * 睡眠数据公共逻辑：令牌校验、时长解析、文件/数据库存储
+ * 健康数据公共逻辑：令牌校验、时长解析、文件/数据库存储
  */
 
 if (!function_exists('healthData_pluginDir')) {
@@ -277,19 +277,32 @@ if (!function_exists('healthData_healthHighlights')) {
         if ($sleepSeconds !== null && $sleepSeconds !== '' && is_numeric($sleepSeconds)) {
             $sleepMinutes = (int) round(((float) $sleepSeconds) / 60);
         }
+        $secToMin = function ($seconds) {
+            if ($seconds === null || $seconds === '' || !is_numeric($seconds)) {
+                return null;
+            }
+            return (int) round(((float) $seconds) / 60);
+        };
 
         return [
             'date' => $record['date'] ?? null,
             'steps' => isset($activity['steps']) ? (int) round((float) $activity['steps']) : null,
             'active_calories' => isset($activity['activeCalories']) ? (float) $activity['activeCalories'] : null,
+            'basal_calories' => isset($activity['basalEnergyBurned']) ? (float) $activity['basalEnergyBurned'] : null,
             'exercise_minutes' => isset($activity['exerciseMinutes']) ? (int) round((float) $activity['exerciseMinutes']) : null,
             'stand_hours' => isset($activity['standHours']) ? (int) round((float) $activity['standHours']) : null,
+            'flights_climbed' => isset($activity['flightsClimbed']) ? (int) round((float) $activity['flightsClimbed']) : null,
             'distance_km' => isset($activity['walkingRunningDistanceKm'])
                 ? (float) $activity['walkingRunningDistanceKm']
                 : (isset($activity['walkingRunningDistance']) ? round(((float) $activity['walkingRunningDistance']) / 1000, 3) : null),
             'resting_heart_rate' => isset($heart['restingHeartRate']) ? (float) $heart['restingHeartRate'] : null,
             'average_heart_rate' => isset($heart['averageHeartRate']) ? (float) $heart['averageHeartRate'] : null,
+            'heart_rate_max' => isset($heart['heartRateMax']) ? (float) $heart['heartRateMax'] : null,
+            'heart_rate_min' => isset($heart['heartRateMin']) ? (float) $heart['heartRateMin'] : null,
             'hrv' => isset($heart['hrv']) ? (float) $heart['hrv'] : null,
+            'respiratory_rate' => isset($vitals['respiratoryRateAvg'])
+                ? (float) $vitals['respiratoryRateAvg']
+                : (isset($vitals['respiratoryRate']) ? (float) $vitals['respiratoryRate'] : null),
             'blood_oxygen' => isset($vitals['bloodOxygenAvg'])
                 ? (float) $vitals['bloodOxygenAvg']
                 : (isset($vitals['bloodOxygen']) ? (float) $vitals['bloodOxygen'] : (isset($vitals['bloodOxygenPercent']) ? (float) $vitals['bloodOxygenPercent'] : null)),
@@ -297,6 +310,11 @@ if (!function_exists('healthData_healthHighlights')) {
             'mindful_minutes' => isset($mind['mindfulMinutes']) ? (float) $mind['mindfulMinutes'] : null,
             'workout_count' => count($workouts),
             'sleep_total_minutes' => $sleepMinutes,
+            'sleep_deep_minutes' => $secToMin($sleep['deepSleep'] ?? null),
+            'sleep_core_minutes' => $secToMin($sleep['coreSleep'] ?? null),
+            'sleep_rem_minutes' => $secToMin($sleep['remSleep'] ?? null),
+            'sleep_bedtime' => isset($sleep['bedtime']) ? (string) $sleep['bedtime'] : null,
+            'sleep_wake_time' => isset($sleep['wakeTime']) ? (string) $sleep['wakeTime'] : null,
             'categories' => $categories,
         ];
     }
@@ -323,7 +341,7 @@ if (!function_exists('healthData_saveHealthDay')) {
         $highlights['updated_at'] = date('c');
 
         $payload = [
-            'schema' => 'sleepdata.health_day',
+            'schema' => 'healthdata.health_day',
             'schema_version' => 1,
             'source_schema' => $record['schema'] ?? null,
             'source_schema_version' => $record['schema_version'] ?? null,
@@ -1059,5 +1077,332 @@ if (!function_exists('healthData_getRecentSleepTimes')) {
             // ignore
         }
         return $times;
+    }
+}
+
+if (!function_exists('healthData_publicCategoryDefaults')) {
+    /**
+     * 独立页默认可公开分类（与真实导出常见字段对齐）
+     * @return array<string,string> value => 中文标签
+     */
+    function healthData_publicCategoryDefaults()
+    {
+        return [
+            'sleep' => '睡眠',
+            'activity' => '活动（步数/热量/距离）',
+            'heart' => '心率',
+            'vitals' => '生命体征（如呼吸频率）',
+            'workouts' => '锻炼',
+            'mobility' => '行动能力',
+            'hearing' => '听力/耳机音量',
+            'mindfulness' => '心态/情绪',
+            'body' => '身体指标（体重等）',
+        ];
+    }
+}
+
+if (!function_exists('healthData_getPublicCategories')) {
+    /**
+     * 读取插件设置中的公开展示分类；未配置时用安全默认值
+     * @return array<int,string>
+     */
+    function healthData_getPublicCategories()
+    {
+        $defaults = ['sleep', 'activity', 'heart', 'workouts'];
+        $allowed = array_keys(healthData_publicCategoryDefaults());
+        try {
+            if (!(class_exists('Typecho_Db') || class_exists('\\Typecho\\Db'))) {
+                return $defaults;
+            }
+            $db = class_exists('Typecho_Db') ? Typecho_Db::get() : \Typecho\Db::get();
+            $options = $db->fetchRow($db->select()->from('table.options')->where('name = ?', 'plugin:HealthData'));
+            if (empty($options['value'])) {
+                return $defaults;
+            }
+            $cfg = @unserialize($options['value']);
+            if (!is_array($cfg) || !isset($cfg['publicCategories'])) {
+                return $defaults;
+            }
+            $cats = $cfg['publicCategories'];
+            if (is_string($cats)) {
+                $cats = array_filter(array_map('trim', explode(',', $cats)));
+            }
+            if (!is_array($cats)) {
+                return $defaults;
+            }
+            $normalized = [];
+            foreach ($cats as $k => $v) {
+                $cand = (is_string($k) && !is_numeric($k)) ? $k : $v;
+                $cand = (string) $cand;
+                if (in_array($cand, $allowed, true)) {
+                    $normalized[] = $cand;
+                }
+            }
+            $normalized = array_values(array_unique($normalized));
+            return !empty($normalized) ? $normalized : $defaults;
+        } catch (Exception $e) {
+            return $defaults;
+        }
+    }
+}
+
+if (!function_exists('healthData_sanitizeWorkoutPublic')) {
+    /**
+     * 锻炼条目去掉设备/源信息，仅保留展示字段
+     */
+    function healthData_sanitizeWorkoutPublic(array $workout)
+    {
+        $name = null;
+        if (!empty($workout['metadata']['HKWorkoutBrandName'])) {
+            $name = (string) $workout['metadata']['HKWorkoutBrandName'];
+        } elseif (!empty($workout['type'])) {
+            $name = (string) $workout['type'];
+        } elseif (!empty($workout['sport'])) {
+            $name = (string) $workout['sport'];
+        }
+        return [
+            'name' => $name,
+            'type' => isset($workout['type']) ? (string) $workout['type'] : null,
+            'sport' => isset($workout['sport']) ? (string) $workout['sport'] : null,
+            'start_time' => isset($workout['startTime']) ? (string) $workout['startTime'] : null,
+            'duration_minutes' => isset($workout['duration']) && is_numeric($workout['duration'])
+                ? (int) round(((float) $workout['duration']) / 60)
+                : null,
+            'duration_formatted' => isset($workout['durationFormatted']) ? (string) $workout['durationFormatted'] : null,
+            'calories' => isset($workout['calories']) ? (float) $workout['calories'] : null,
+        ];
+    }
+}
+
+if (!function_exists('healthData_filterHighlightsPublic')) {
+    /**
+     * 按公开分类裁剪亮点字段
+     * @param array $highlights
+     * @param array $enabled
+     * @return array
+     */
+    function healthData_filterHighlightsPublic(array $highlights, array $enabled)
+    {
+        $out = ['date' => $highlights['date'] ?? null];
+        $map = [
+            'activity' => ['steps', 'active_calories', 'basal_calories', 'exercise_minutes', 'stand_hours', 'flights_climbed', 'distance_km'],
+            'heart' => ['resting_heart_rate', 'average_heart_rate', 'heart_rate_max', 'heart_rate_min', 'hrv'],
+            'vitals' => ['respiratory_rate', 'blood_oxygen'],
+            'sleep' => ['sleep_total_minutes', 'sleep_deep_minutes', 'sleep_core_minutes', 'sleep_rem_minutes', 'sleep_bedtime', 'sleep_wake_time'],
+            'workouts' => ['workout_count'],
+            'body' => ['weight'],
+            'mindfulness' => ['mindful_minutes'],
+        ];
+        foreach ($map as $cat => $fields) {
+            if (!in_array($cat, $enabled, true)) {
+                continue;
+            }
+            foreach ($fields as $f) {
+                if (array_key_exists($f, $highlights)) {
+                    $out[$f] = $highlights[$f];
+                }
+            }
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('healthData_filterDayPublic')) {
+    /**
+     * 组装独立页可用的单日公开数据
+     * @param array $dayPayload healthData_loadHealthDay 结果
+     * @param array $enabled
+     * @param array|null $sleepWakeRow sleep_data.json 中按起床日对齐的行（可选）
+     * @return array
+     */
+    function healthData_filterDayPublic(array $dayPayload, array $enabled, $sleepWakeRow = null)
+    {
+        $highlights = isset($dayPayload['highlights']) && is_array($dayPayload['highlights'])
+            ? $dayPayload['highlights']
+            : [];
+        $health = isset($dayPayload['health']) && is_array($dayPayload['health'])
+            ? $dayPayload['health']
+            : [];
+
+        $item = healthData_filterHighlightsPublic($highlights, $enabled);
+        $item['date'] = $dayPayload['date'] ?? ($highlights['date'] ?? null);
+
+        // 起床日睡眠摘要（主题/独立页主用）优先于 Health.md 日历日睡眠
+        if (in_array('sleep', $enabled, true) && is_array($sleepWakeRow)) {
+            $item['sleep'] = [
+                'date' => $sleepWakeRow['date'] ?? null,
+                'sleep_time' => isset($sleepWakeRow['sleep_time']) ? substr((string) $sleepWakeRow['sleep_time'], 0, 5) : null,
+                'wake_up_time' => isset($sleepWakeRow['wake_up_time']) ? substr((string) $sleepWakeRow['wake_up_time'], 0, 5) : null,
+                'sleep_score' => isset($sleepWakeRow['sleep_score']) ? (int) $sleepWakeRow['sleep_score'] : null,
+                'score_estimated' => !empty($sleepWakeRow['score_estimated']),
+                'deep_sleep_minutes' => isset($sleepWakeRow['deep_sleep_minutes']) ? (int) $sleepWakeRow['deep_sleep_minutes'] : null,
+                'light_sleep_minutes' => isset($sleepWakeRow['light_sleep_minutes']) ? (int) $sleepWakeRow['light_sleep_minutes'] : null,
+                'rem_sleep_minutes' => isset($sleepWakeRow['rem_sleep_minutes']) ? (int) $sleepWakeRow['rem_sleep_minutes'] : null,
+                'awake_minutes' => isset($sleepWakeRow['awake_minutes']) ? (int) $sleepWakeRow['awake_minutes'] : null,
+                'total_sleep_minutes' => isset($sleepWakeRow['total_sleep_minutes']) ? (int) $sleepWakeRow['total_sleep_minutes'] : null,
+                'alignment' => 'wake_day',
+            ];
+            if ($item['sleep']['total_sleep_minutes'] !== null) {
+                $item['sleep_total_minutes'] = $item['sleep']['total_sleep_minutes'];
+            }
+        } elseif (in_array('sleep', $enabled, true) && !empty($health['sleep']) && is_array($health['sleep'])) {
+            $s = $health['sleep'];
+            $item['sleep'] = [
+                'date' => $item['date'],
+                'sleep_time' => isset($s['bedtime']) ? (string) $s['bedtime'] : null,
+                'wake_up_time' => isset($s['wakeTime']) ? (string) $s['wakeTime'] : null,
+                'sleep_score' => null,
+                'score_estimated' => true,
+                'deep_sleep_minutes' => $item['sleep_deep_minutes'] ?? null,
+                'light_sleep_minutes' => $item['sleep_core_minutes'] ?? null,
+                'rem_sleep_minutes' => $item['sleep_rem_minutes'] ?? null,
+                'awake_minutes' => null,
+                'total_sleep_minutes' => $item['sleep_total_minutes'] ?? null,
+                'alignment' => 'calendar_day',
+            ];
+        }
+
+        if (in_array('workouts', $enabled, true) && !empty($health['workouts']) && is_array($health['workouts'])) {
+            $item['workouts'] = [];
+            foreach ($health['workouts'] as $w) {
+                if (is_array($w)) {
+                    $item['workouts'][] = healthData_sanitizeWorkoutPublic($w);
+                }
+            }
+        }
+
+        if (in_array('mobility', $enabled, true) && !empty($health['mobility']) && is_array($health['mobility'])) {
+            $m = $health['mobility'];
+            $item['mobility'] = [
+                'walking_speed' => isset($m['walkingSpeed']) ? (float) $m['walkingSpeed'] : null,
+                'walking_step_length' => isset($m['walkingStepLength']) ? (float) $m['walkingStepLength'] : null,
+                'walking_steadiness_percent' => isset($m['walkingSteadinessPercent']) ? (float) $m['walkingSteadinessPercent'] : null,
+            ];
+        }
+
+        // hearing / mindfulness：仅在明确开启时给极简字段，不返回情绪明细条目
+        if (in_array('hearing', $enabled, true) && !empty($health['hearing']['headphoneAudioLevel'])) {
+            $item['hearing'] = [
+                'headphone_audio_db' => (float) $health['hearing']['headphoneAudioLevel'],
+            ];
+        }
+        if (in_array('mindfulness', $enabled, true) && !empty($health['mindfulness']) && is_array($health['mindfulness'])) {
+            $mind = $health['mindfulness'];
+            $item['mindfulness'] = [
+                'average_valence_percent' => isset($mind['averageValencePercent']) ? (float) $mind['averageValencePercent'] : null,
+                'emotion_labels' => isset($mind['emotionLabels']) && is_array($mind['emotionLabels'])
+                    ? array_values(array_map('strval', $mind['emotionLabels']))
+                    : [],
+            ];
+        }
+
+        return $item;
+    }
+}
+
+if (!function_exists('healthData_loadSleepSummaryMap')) {
+    /**
+     * 读取 sleep_data.json，按 date => row
+     * @return array<string,array>
+     */
+    function healthData_loadSleepSummaryMap()
+    {
+        $map = [];
+        try {
+            $file = healthData_resolveDataFile();
+            if (!file_exists($file)) {
+                return $map;
+            }
+            $rows = json_decode((string) file_get_contents($file), true);
+            if (!is_array($rows)) {
+                return $map;
+            }
+            foreach ($rows as $row) {
+                if (!is_array($row) || empty($row['date'])) {
+                    continue;
+                }
+                $map[(string) $row['date']] = $row;
+            }
+        } catch (Exception $e) {
+            // ignore
+        }
+        return $map;
+    }
+}
+
+if (!function_exists('healthData_backfillFromRaw')) {
+    /**
+     * 从 data/raw/daily/*.json 回填 data/health/
+     * @return array{scanned:int, saved:int, skipped:int, errors:array}
+     */
+    function healthData_backfillFromRaw()
+    {
+        healthData_ensureDataDirs();
+        $dir = healthData_pluginDir() . '/data/raw/daily';
+        $result = ['scanned' => 0, 'saved' => 0, 'skipped' => 0, 'errors' => []];
+        if (!is_dir($dir)) {
+            return $result;
+        }
+        $files = glob($dir . '/*.json') ?: [];
+        foreach ($files as $file) {
+            $result['scanned']++;
+            $decoded = json_decode((string) file_get_contents($file), true);
+            if (!is_array($decoded)) {
+                $result['skipped']++;
+                $result['errors'][] = basename($file) . ': invalid json';
+                continue;
+            }
+            // 兼容 envelope
+            if (!empty($decoded['records']) && is_array($decoded['records'])) {
+                foreach ($decoded['records'] as $rec) {
+                    if (!is_array($rec) || empty($rec['date'])) {
+                        $result['skipped']++;
+                        continue;
+                    }
+                    try {
+                        healthData_saveHealthDay($rec);
+                        $result['saved']++;
+                    } catch (Exception $e) {
+                        $result['skipped']++;
+                        $result['errors'][] = ($rec['date'] ?? '?') . ': ' . $e->getMessage();
+                    }
+                }
+                continue;
+            }
+            if (empty($decoded['date'])) {
+                $result['skipped']++;
+                continue;
+            }
+            try {
+                healthData_saveHealthDay($decoded);
+                $result['saved']++;
+            } catch (Exception $e) {
+                $result['skipped']++;
+                $result['errors'][] = ($decoded['date'] ?? basename($file)) . ': ' . $e->getMessage();
+            }
+        }
+        return $result;
+    }
+}
+
+if (!function_exists('healthData_ensureHealthIndexFromRaw')) {
+    /**
+     * 若健康索引为空且 raw 有文件，则自动回填一次
+     */
+    function healthData_ensureHealthIndexFromRaw()
+    {
+        $index = healthData_loadHealthIndex(1);
+        if (!empty($index)) {
+            return null;
+        }
+        $dir = healthData_pluginDir() . '/data/raw/daily';
+        if (!is_dir($dir)) {
+            return null;
+        }
+        $files = glob($dir . '/*.json') ?: [];
+        if (empty($files)) {
+            return null;
+        }
+        return healthData_backfillFromRaw();
     }
 }
