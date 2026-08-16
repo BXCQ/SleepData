@@ -4,13 +4,16 @@
  *
  * 仅返回插件设置中勾选的分类；敏感字段已裁剪。
  *
+ * 性能说明：
+ * - 列表模式只读 index.json + sleep_data.json（O(1) 文件），不逐日打开 daily
+ * - 单日详情 / latest 才读取对应 daily 文件
+ *
  * GET 参数：
  * - days=N            最近 N 天列表（默认 30，最大 120）
  * - start=YYYY-MM-DD  与 end 联用：日期范围
  * - end=YYYY-MM-DD
  * - date=YYYY-MM-DD   单日详情
  * - latest=1          最近有数据的一天
- * - backfill=1        若索引为空则从 raw/daily 回填（只读场景的懒加载）
  */
 
 if (function_exists('apache_setenv')) {
@@ -48,26 +51,60 @@ try {
         exit;
     }
 
-    if (!empty($_GET['backfill'])) {
-        healthData_ensureHealthIndexFromRaw();
-    } else {
-        healthData_ensureHealthIndexFromRaw();
-    }
+    // 仅在索引缺失时回填，避免每次请求扫 raw 目录
+    healthData_ensureHealthIndexFromRaw();
 
     $enabled = healthData_getPublicCategories();
-    $sleepMap = in_array('sleep', $enabled, true) ? healthData_loadSleepSummaryMap() : [];
+    $wantSleep = in_array('sleep', $enabled, true);
+    $sleepMap = $wantSleep ? healthData_loadSleepSummaryMap() : [];
 
-    $date = isset($_GET['date']) ? preg_replace('/[^0-9\\-]/', '', (string) $_GET['date']) : '';
-    $latest = !empty($_GET['latest']);
-    $start = isset($_GET['start']) ? preg_replace('/[^0-9\\-]/', '', (string) $_GET['start']) : '';
-    $end = isset($_GET['end']) ? preg_replace('/[^0-9\\-]/', '', (string) $_GET['end']) : '';
-    $days = isset($_GET['days']) ? (int) $_GET['days'] : 0;
+    $attachSleepFromMap = function (array $item, $date) use ($sleepMap, $wantSleep) {
+        if (!$wantSleep || $date === null || $date === '') {
+            return $item;
+        }
+        // 优先同日；若无则尝试次日（起床日）
+        $sr = null;
+        if (isset($sleepMap[$date])) {
+            $sr = $sleepMap[$date];
+        } else {
+            try {
+                $next = (new DateTimeImmutable($date))->modify('+1 day')->format('Y-m-d');
+                if (isset($sleepMap[$next])) {
+                    $sr = $sleepMap[$next];
+                }
+            } catch (Exception $e) {
+                // ignore
+            }
+        }
+        if ($sr === null) {
+            return $item;
+        }
+        $item['sleep'] = [
+            'date' => $sr['date'] ?? null,
+            'sleep_time' => isset($sr['sleep_time']) ? substr((string) $sr['sleep_time'], 0, 5) : null,
+            'wake_up_time' => isset($sr['wake_up_time']) ? substr((string) $sr['wake_up_time'], 0, 5) : null,
+            'sleep_score' => isset($sr['sleep_score']) ? (int) $sr['sleep_score'] : null,
+            'score_estimated' => !empty($sr['score_estimated']),
+            'deep_sleep_minutes' => isset($sr['deep_sleep_minutes']) ? (int) $sr['deep_sleep_minutes'] : null,
+            'light_sleep_minutes' => isset($sr['light_sleep_minutes']) ? (int) $sr['light_sleep_minutes'] : null,
+            'rem_sleep_minutes' => isset($sr['rem_sleep_minutes']) ? (int) $sr['rem_sleep_minutes'] : null,
+            'awake_minutes' => isset($sr['awake_minutes']) ? (int) $sr['awake_minutes'] : null,
+            'total_sleep_minutes' => isset($sr['total_sleep_minutes']) ? (int) $sr['total_sleep_minutes'] : null,
+            'alignment' => 'wake_day',
+        ];
+        if ($item['sleep']['total_sleep_minutes'] !== null) {
+            $item['sleep_total_minutes'] = $item['sleep']['total_sleep_minutes'];
+        }
+        if ($item['sleep']['sleep_score'] !== null) {
+            $item['sleep_score'] = $item['sleep']['sleep_score'];
+        }
+        return $item;
+    };
 
-    $buildItem = function ($dayPayload) use ($enabled, $sleepMap) {
+    $buildItemFromFullDay = function ($dayPayload) use ($enabled, $sleepMap) {
         $d = $dayPayload['date'] ?? null;
         $health = isset($dayPayload['health']) && is_array($dayPayload['health']) ? $dayPayload['health'] : [];
         $sleepRow = null;
-        // 优先用 wakeTimeISO 对齐 sleep_data（起床日）
         if (!empty($health['sleep']['wakeTimeISO'])) {
             $wakeDt = healthData_parseDateTime($health['sleep']['wakeTimeISO']);
             if ($wakeDt) {
@@ -88,6 +125,12 @@ try {
         return healthData_filterDayPublic($dayPayload, $enabled, $sleepRow);
     };
 
+    $date = isset($_GET['date']) ? preg_replace('/[^0-9\\-]/', '', (string) $_GET['date']) : '';
+    $latest = !empty($_GET['latest']);
+    $start = isset($_GET['start']) ? preg_replace('/[^0-9\\-]/', '', (string) $_GET['start']) : '';
+    $end = isset($_GET['end']) ? preg_replace('/[^0-9\\-]/', '', (string) $_GET['end']) : '';
+    $days = isset($_GET['days']) ? (int) $_GET['days'] : 0;
+
     if ($date !== '') {
         $day = healthData_loadHealthDay($date);
         if ($day === null) {
@@ -104,7 +147,7 @@ try {
             'status' => 'success',
             'mode' => 'date',
             'enabled' => $enabled,
-            'item' => $buildItem($day),
+            'item' => $buildItemFromFullDay($day),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -124,12 +167,12 @@ try {
             'status' => 'success',
             'mode' => 'latest',
             'enabled' => $enabled,
-            'item' => $buildItem($day),
+            'item' => $buildItemFromFullDay($day),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
-    // 列表：优先日期范围，否则 days
+    // —— 列表：只读索引，不逐日打开 daily ——
     $index = healthData_loadHealthIndex(400);
     if ($start !== '' && $end !== '') {
         $filtered = [];
@@ -149,7 +192,6 @@ try {
         $index = array_slice($index, 0, $days);
     }
 
-    // 按日期升序便于画趋势
     usort($index, function ($a, $b) {
         return strcmp((string) ($a['date'] ?? ''), (string) ($b['date'] ?? ''));
     });
@@ -168,20 +210,9 @@ try {
         if ($d === '') {
             continue;
         }
-        $full = healthData_loadHealthDay($d);
-        if ($full === null) {
-            // 仅有索引时也返回裁剪亮点
-            $item = healthData_filterHighlightsPublic($row, $enabled);
-            if (in_array('sleep', $enabled, true) && isset($sleepMap[$d])) {
-                $sr = $sleepMap[$d];
-                $item['sleep_total_minutes'] = isset($sr['total_sleep_minutes']) ? (int) $sr['total_sleep_minutes'] : ($item['sleep_total_minutes'] ?? null);
-                $item['sleep_score'] = isset($sr['sleep_score']) ? (int) $sr['sleep_score'] : null;
-            }
-            $items[] = $item;
-        } else {
-            $item = $buildItem($full);
-            $items[] = $item;
-        }
+        $item = healthData_filterHighlightsPublic($row, $enabled);
+        $item = $attachSleepFromMap($item, $d);
+        $items[] = $item;
 
         if (isset($item['steps']) && $item['steps'] !== null) {
             $sumSteps += (float) $item['steps'];

@@ -309,6 +309,7 @@ if (!function_exists('healthData_healthHighlights')) {
             'weight' => isset($body['weight']) ? (float) $body['weight'] : null,
             'mindful_minutes' => isset($mind['mindfulMinutes']) ? (float) $mind['mindfulMinutes'] : null,
             'workout_count' => count($workouts),
+            'workouts' => array_values(array_map('healthData_sanitizeWorkoutPublic', array_filter($workouts, 'is_array'))),
             'sleep_total_minutes' => $sleepMinutes,
             'sleep_deep_minutes' => $secToMin($sleep['deepSleep'] ?? null),
             'sleep_core_minutes' => $secToMin($sleep['coreSleep'] ?? null),
@@ -1189,7 +1190,7 @@ if (!function_exists('healthData_filterHighlightsPublic')) {
             'heart' => ['resting_heart_rate', 'average_heart_rate', 'heart_rate_max', 'heart_rate_min', 'hrv'],
             'vitals' => ['respiratory_rate', 'blood_oxygen'],
             'sleep' => ['sleep_total_minutes', 'sleep_deep_minutes', 'sleep_core_minutes', 'sleep_rem_minutes', 'sleep_bedtime', 'sleep_wake_time'],
-            'workouts' => ['workout_count'],
+            'workouts' => ['workout_count', 'workouts'],
             'body' => ['weight'],
             'mindfulness' => ['mindful_minutes'],
         ];
@@ -1202,6 +1203,10 @@ if (!function_exists('healthData_filterHighlightsPublic')) {
                     $out[$f] = $highlights[$f];
                 }
             }
+        }
+        // 列表场景：若索引里已有裁剪后的 workouts，附到 item 上供展开
+        if (in_array('workouts', $enabled, true) && !empty($highlights['workouts']) && is_array($highlights['workouts'])) {
+            $out['workouts'] = $highlights['workouts'];
         }
         return $out;
     }
@@ -1391,8 +1396,9 @@ if (!function_exists('healthData_ensureHealthIndexFromRaw')) {
      */
     function healthData_ensureHealthIndexFromRaw()
     {
-        $index = healthData_loadHealthIndex(1);
-        if (!empty($index)) {
+        $indexFile = healthData_pluginDir() . '/data/health/index.json';
+        // 快路径：索引文件已存在且非空，避免每次解析整份 index
+        if (is_file($indexFile) && @filesize($indexFile) > 2) {
             return null;
         }
         $dir = healthData_pluginDir() . '/data/raw/daily';
