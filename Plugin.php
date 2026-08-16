@@ -100,17 +100,11 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
      */
     public static function installThemeTemplate($overwrite = false)
     {
-        // 优先使用完整版 Handsome 模板
+        // Handsome 完整布局模板（与 VisitorLoggerPro/visitor-stats.php 同结构）
         $src = dirname(__FILE__) . '/health-stats.php';
         $destName = 'health-stats.php';
         $marker = 'HealthData-health-stats@';
         $markerVersion = '2.1.0';
-
-        if (!file_exists($src)) {
-            $src = dirname(__FILE__) . '/theme-templates/page-health.php';
-            $destName = 'page-health.php';
-            $marker = 'HealthData-page-health@';
-        }
 
         if (!file_exists($src)) {
             return _t('未找到独立页模板 health-stats.php');
@@ -508,7 +502,7 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
         $health_query_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/health-api.php';
         $public_api_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/public-health-api.php';
         $backfill_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/backfill-from-raw.php';
-        $view_health_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/view-health.php';
+        $upload_page_url = Helper::options()->siteUrl . 'usr/plugins/HealthData/index.html';
 
         // 添加访问令牌设置
         $accessToken = new Typecho_Widget_Helper_Form_Element_Text(
@@ -550,7 +544,6 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
         echo '<li>填写标题（如「我的健康」）、设置缩略名（如 <code>health</code>）后发布</li>';
         echo '</ol>';
         echo '<p>若下拉框没有该项：确认主题目录已有 <code>health-stats.php</code>（由插件自动安装），或手动复制插件内该文件到主题根目录。</p>';
-        echo '<p>免主题查看页：<br><code>' . htmlspecialchars($view_health_url) . '</code></p>';
         echo '</div>';
 
         echo '<div class="api-info">';
@@ -559,7 +552,7 @@ class HealthData_Plugin implements Typecho_Plugin_Interface
         echo '<p>在 Health.md 填写上述 Endpoint，Token 填本页访问令牌。可勾选 Sleep / Activity / Heart / Vitals 等<strong>全部</strong>指标。</p>';
         echo '<p><strong>全日健康查询（需令牌）：</strong><br><code>' . htmlspecialchars($health_query_url) . '?latest=1&amp;access_token=令牌</code></p>';
         echo '<p><strong>独立页公开接口（无需令牌，按上方勾选过滤）：</strong><br><code>' . htmlspecialchars($public_api_url) . '?days=30</code></p>';
-        echo '<p>手动上传页 API：<br><code>' . htmlspecialchars($api_url) . '</code></p>';
+        echo '<p>手动 OCR 上传页：<br><code>' . htmlspecialchars($upload_page_url) . '</code><br>对应 API：<code>' . htmlspecialchars($api_url) . '</code></p>';
         echo '<p><strong>从 raw 回填健康索引（需令牌）：</strong><br><code>' . htmlspecialchars($backfill_url) . '?access_token=令牌</code></p>';
         echo '<p>说明见 <code>HEALTHMD.md</code> / <code>README.md</code>。</p>';
         echo '<p>重要：写入类 API 需要访问令牌；公开独立页接口不需要，但只返回已勾选分类。</p>';

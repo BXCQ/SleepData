@@ -57,8 +57,7 @@ loadEChartsWithFallback();
                     <article class="single-post panel">
                         <div id="post-content" class="wrapper-lg">
                             <div class="health-stats-container" id="healthStatsApp"
-                                 data-api="<?php echo htmlspecialchars($publicApi); ?>">
-
+                                data-api="<?php echo htmlspecialchars($publicApi); ?>">
                                 <div class="hs-date-filter">
                                     <span class="hs-label">日期范围</span>
                                     <input type="date" id="hsStart">

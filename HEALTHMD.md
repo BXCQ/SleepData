@@ -76,9 +76,12 @@ curl 'https://blog.ybyq.wang/usr/plugins/HealthData/backfill-from-raw.php?access
 
 ### Handsome 独立页
 
+与访客统计 `visitor-stats.php` 相同：嵌在主题完整布局（顶栏 / 侧栏 / 主内容）中。
+
 1. 启用插件后会自动安装 `health-stats.php` 到主题根目录（也可手动复制）  
 2. 后台新建页面，模板选「健康数据」  
 3. 插件设置勾选公开展示分类（默认睡眠/活动/心率/锻炼）
+4. 前端通过 `public-health-api.php` 拉取公开数据
 
 ## 睡眠映射
 
@@ -173,11 +176,13 @@ curl -X POST 'https://blog.ybyq.wang/usr/plugins/HealthData/healthmd-api.php' \
 
 至少需要：
 
+- `Plugin.php`
+- `lib/HealthDataHelper.php`
 - `healthmd-api.php`
 - `health-api.php`
 - `public-health-api.php`
 - `backfill-from-raw.php`
 - `health-stats.php`（启用插件时自动复制到主题根目录）
-- `view-health.php`（可选，免主题查看页）
-- `lib/HealthDataHelper.php`
-- `Plugin.php`
+- `simple-api.php` / `index.html`（可选，OCR 手动上传）
+- `data_config.php`
+- `data/` 目录结构（`.gitkeep`）
